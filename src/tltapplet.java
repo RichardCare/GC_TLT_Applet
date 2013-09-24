@@ -30,6 +30,9 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         RPCVariable<Integer> AttenuatorActual;
         RPCVariable<Integer> AttenuatorUpdate;
 
+    RPCVariable<Integer> minFrequencyMHz;
+    RPCVariable<Integer> maxFrequencyMHz;
+
 //        RPCVariable<Integer> LocalActiveBtn;
 //        RPCVariable<Integer> EnterBtn;
         //RPCVariable<Integer> IncreaseBtn;
@@ -136,6 +139,9 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
                 AttenuatorActual = new RPCVariable<Integer>(mbed,"RemoteAttenuatorActual");
                 AttenuatorUpdate = new RPCVariable<Integer>(mbed,"RemoteAttenuatorUpdate");
 
+                minFrequencyMHz = new RPCVariable<Integer>(mbed, "RemoteMinFreqMHz");
+                maxFrequencyMHz = new RPCVariable<Integer>(mbed, "RemoteMaxFreqMHz");
+
                 //LocalActiveBtn = new RPCVariable<Integer>(mbed,"RemoteLocalActiveBtn");
                 //EnterBtn = new RPCVariable<Integer>(mbed,"RemoteEnterBtn");
                 //IncreaseBtn = new RPCVariable<Integer>(mbed,"RemoteIncreaseBtn");
@@ -226,13 +232,13 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
                 SynthFrequency=SynthFrequencyActual.read_int();
                 Attenuation=AttenuatorActual.read_int();
 
-                if (SynthType_i<1){
-                    SYNTH_FREQ_MIN=1500;
-                    SYNTH_FREQ_MAX=3300;
-                }else{
-                    SYNTH_FREQ_MIN=8000;
-                    SYNTH_FREQ_MAX=13100;
-                }
+                // get limits on user entered frequency from mbed (no longer using SynthType_i)
+                SYNTH_FREQ_MIN = minFrequencyMHz.read_int();
+                SYNTH_FREQ_MAX = maxFrequencyMHz.read_int();
+
+                System.out.format("Synth frequency: actual = %d, limits: min = %d  max = %d\n",
+                        SynthFrequency, SYNTH_FREQ_MIN, SYNTH_FREQ_MAX);
+
                 if (AttType_i<1){
                     ATT_MAX=127;
                 }else{
