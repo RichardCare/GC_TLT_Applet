@@ -544,10 +544,10 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         int d = parseInt(text, split[3]);
 
         int value =
-                a & 0xFF <<  0;
-        value = b <<  8 & 0xFF;
-        value = c << 16 & 0xFF;
-        value = d << 24 & 0xFF;
+                 (a & 0xFF) <<  0;
+        value |= (b & 0xFF) <<  8;
+        value |= (c & 0xFF) << 16;
+        value |= (d & 0xFF) << 24;
 
         return value;
     }
