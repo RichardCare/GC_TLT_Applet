@@ -103,11 +103,13 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     TextField ipAddrField = new TextField(20);
     Label ipMaskLabel = new Label("IP Mask");
     TextField ipMaskField = new TextField(20);
+    Label ipErrorLabel = new Label();
     Button ipSet = new Button("Update IP");
 
     // **************************************************************************
     // * function to initialise
     // *
+    @Override
     public void init() {
 
         setLayout(null);
@@ -179,6 +181,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             ipMaskField.setBounds(110, 500, 110, 20);
 
             ipSet.setBounds(160, 530, 60, 20);
+            ipErrorLabel.setBounds(20, 560, 220, 20);
 
             add(LocalActive_ALBtn);
             add(Enter_ALBtn);
@@ -196,6 +199,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             add(ipAddrField);
             add(ipMaskLabel);
             add(ipMaskField);
+            add(ipErrorLabel);
             add(ipSet);
 
             LocalActive_ALBtn.addActionListener(this);
@@ -210,6 +214,23 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             AttIncxx_ALBtn.addActionListener(this);
             AttDecxx_ALBtn.addActionListener(this);
             Refresh_ALBtn.addActionListener(this);
+            ipSet.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    try {
+                        int addr = ipIntFromTextField(ipAddrField);
+                        int mask = ipIntFromTextField(ipMaskField);
+
+                        ipAddrRpc.write(addr);
+                        ipMaskRpc.write(mask);
+
+                        ipAddrField.setText("IP address updating");
+                        ipMaskField.setText("IP mask updating");
+                        ipErrorLabel.setText("");
+                    } catch (IllegalArgumentException x) {
+                        ipErrorLabel.setText(x.getMessage());
+                    }
+                }});
 
             get_data();
             SynthFrequency = SynthFrequencyActual.read_int();
@@ -235,12 +256,14 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     // **************************************************************************
     // * functions for timer and memory control
     // *
+    @Override
     public void start() {
         if (comms_active == 1) {
             refresh_timer.start();
         }
     }
 
+    @Override
     public void stop() {
         if (comms_active == 1) {
             CtrlAction.write(0x02); // 01=Set Remote Comms off
@@ -250,6 +273,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         super.destroy();
     }
 
+    @Override
     public void destroy() {
         if (comms_active == 1) {
             CtrlAction.write(0x02); // 01=Set Remote Comms off
@@ -287,6 +311,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     // * function to be called for each refresh iteration
     // *
     ActionListener timerListener = new ActionListener() {
+        @Override
         public void actionPerformed(ActionEvent ev) {
 
             connection_ctr = connection_ctr + 1;
@@ -311,9 +336,10 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     // **************************************************************************
     // * function to setup graphics and paint (empty)
     // *
+    @Override
     public void paint(Graphics g) {
         g.setColor(Color.blue);
-        g.drawRoundRect(1, 1, 260, 560, 20, 20);
+        g.drawRoundRect(1, 1, 260, 590, 20, 20);
 
         Font smallFont = new Font("Arial", Font.PLAIN, 13);
         Font bigFont = new Font("Arial", Font.PLAIN, 32);
@@ -373,7 +399,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
             g.setColor(Color.gray);
             g.setFont(smallFont);
-            g.drawString(String.valueOf(connection_ctr), 270, 560);
+            g.drawString(String.valueOf(connection_ctr), 270, 590);
         } else {
             g.setFont(smallFont);
             g.setColor(Color.black);
@@ -383,6 +409,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     }
 
     // Here we ask which component called this method
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (evt.getSource() == LocalActive_ALBtn) {
             CtrlAction.write(0x03); // LR on
@@ -502,5 +529,40 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         int c = value >> 16 & 0xFF;
         int d = value >> 24 & 0xFF;
         ipField.setText(String.format("%d.%d.%d.%d", a, b, c, d));
+    }
+
+    protected int ipIntFromTextField(TextField ipField) throws IllegalArgumentException {
+        // NOTE: Byte order for char[4] written to mbed
+        String text = ipField.getText();
+        String[] split = text.split("\\.");
+        if (split.length != 4) {
+            throw new IllegalArgumentException("Expected 4 numbers in " + text);
+        }
+        int a = parseInt(text, split[0]);
+        int b = parseInt(text, split[1]);
+        int c = parseInt(text, split[2]);
+        int d = parseInt(text, split[3]);
+
+        int value =
+                a & 0xFF <<  0;
+        value = b <<  8 & 0xFF;
+        value = c << 16 & 0xFF;
+        value = d << 24 & 0xFF;
+
+        return value;
+    }
+
+    private int parseInt(String whole, String value) {
+        try {
+            int result = Integer.parseInt(value);
+            if (result < 0 || result > 255) {
+                throw new IllegalArgumentException(
+                        String.format("Invalid number %s in %s", value, whole));
+            }
+            return result;
+        } catch (NumberFormatException x) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid number %s in %s", value, whole));
+        }
     }
 }
