@@ -114,7 +114,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
         setLayout(null);
 
-        mbed = new HTTPRPC("http://192.168.2.60" /*this*/); // TODO
+        mbed = new HTTPRPC(this /* or "http://192.168.2.60"*/);
 
         LEDStatus1 = new RPCVariable<Character>(mbed, "RemoteLEDStatus1"); // won't work with bool
         LEDStatus1_i = LEDStatus1.read_char();
@@ -175,10 +175,10 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             Refresh_ALBtn.setBounds(20, 420, 220, 30);
 
             ipAddrLabel.setBounds(40, 470, 70, 20);
-            ipAddrField.setBounds(110, 470, 110, 20);
+            ipAddrField.setBounds(110, 470, 120, 20);
 
             ipMaskLabel.setBounds(40, 500, 70, 20);
-            ipMaskField.setBounds(110, 500, 110, 20);
+            ipMaskField.setBounds(110, 500, 120, 20);
 
             ipSet.setBounds(160, 530, 60, 20);
             ipErrorLabel.setBounds(20, 560, 220, 20);
@@ -221,12 +221,19 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
                         int addr = ipIntFromTextField(ipAddrField);
                         int mask = ipIntFromTextField(ipMaskField);
 
-                        ipAddrRpc.write(addr);
-                        ipMaskRpc.write(mask);
-
                         ipAddrField.setText("IP address updating");
                         ipMaskField.setText("IP mask updating");
                         ipErrorLabel.setText("");
+                        try {
+                            Thread.sleep(1000);  // give time for repaint
+                        } catch (InterruptedException x) {
+                            System.out.println("This is surprising... Thread.sleep() raised InterruptedException");
+                            Thread.currentThread().interrupt();
+                        }
+
+                        ipAddrRpc.write(addr);
+                        ipMaskRpc.write(mask);
+                        CtrlAction.write(7); // notify IP change
                     } catch (IllegalArgumentException x) {
                         ipErrorLabel.setText(x.getMessage());
                     }
