@@ -51,9 +51,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     int LED_dy = 28;
     int LED_r = 6;
 
-    int LEDStatus0_i = 0;
-    int LEDStatus1_i = 0;
-    int LocalActiveLED_i = 0;
+    boolean frontPanelControlled = false;
     int SynthLockLED_i = 0;
 
     int PSU1Alarm_i = 0;
@@ -117,9 +115,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         mbed = new HTTPRPC(this /* or "http://192.168.2.60"*/);
 
         LEDStatus1 = new RPCVariable<Character>(mbed, "RemoteLEDStatus1"); // won't work with bool
-        LEDStatus1_i = LEDStatus1.read_char();
-
-        CommsOpenFlag = ((LEDStatus1_i >> 4) & 0x01);
+        CommsOpenFlag = (LEDStatus1.read_char() >> 4) & 0x01;
 
         if (CommsOpenFlag == 0) {
             CtrlAction = new RPCVariable<Integer>(mbed, "RemoteCtrlAction");
@@ -295,21 +291,24 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     // *
     public void get_data() {
 
-        LEDStatus0_i = LEDStatus0.read_char();
-        LEDStatus1_i = LEDStatus1.read_char();
+        int LEDStatus0_i = LEDStatus0.read_char();
+        int LEDStatus1_i = LEDStatus1.read_char();
 
         SynthLockLED_i = ((LEDStatus0_i >> 2) & 0x00000001);
-        LocalActiveLED_i = ((LEDStatus0_i >> 4) & 0x00000001);
+        frontPanelControlled = (LEDStatus0_i & 0x10) != 0;
         PSU1Alarm_i = ((LEDStatus0_i >> 7) & 0x00000001);
         SynthType_i = ((LEDStatus1_i >> 1) & 0x00000001);
         AttType_i = ((LEDStatus1_i >> 2) & 0x00000001);
         SerialAlarm_i = ((LEDStatus1_i >> 3) & 0x00000001);
 
-        if (LocalActiveLED_i >= 1) {
+        if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
         }
 
+        ipAddrField.setEnabled(!frontPanelControlled);
+        ipMaskField.setEnabled(!frontPanelControlled);
+        ipSet.setEnabled(!frontPanelControlled);
         setIpTextField(ipAddrField, ipAddrRpc);
         setIpTextField(ipMaskField, ipMaskRpc);
     }
@@ -377,7 +376,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             }
 
             // Draw Local/Remote LED and fill if active
-            if (LocalActiveLED_i <= 0) {
+            if (!frontPanelControlled) {
                 g.setColor(Color.orange);
             } else {
                 g.setColor(Color.white);
@@ -430,7 +429,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             repaint();
         }
 
-        if (LocalActiveLED_i <= 0) {
+        if (!frontPanelControlled) {
             if (evt.getSource() == Enter_ALBtn) {
                 SynthFrequencyUpdate.write(SynthFrequency);
                 AttenuatorUpdate.write(Attenuation);
