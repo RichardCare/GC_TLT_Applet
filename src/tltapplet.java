@@ -23,8 +23,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
     // setup local and rpc variables
     RPCVariable<Integer> CtrlAction;
-    RPCVariable<Character> LEDStatus0;
-    RPCVariable<Character> LEDStatus1;
+    RPCVariable<Integer> LEDStatus;
     RPCVariable<Integer> SynthFrequencyActual;
     RPCVariable<Integer> SynthFrequencyUpdate;
     RPCVariable<Integer> AttenuatorActual;
@@ -36,7 +35,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     RPCVariable<Integer> ipAddrRpc;
     RPCVariable<Integer> ipMaskRpc;
 
-    // screen position copordinates for drawing LEDs, Btns and text
+    // screen position coordinates for drawing LEDs, Btns and text
     int LED1_x = 20;
     int LED2_x = 80;
     int LED3_x = 140;
@@ -114,15 +113,16 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
         mbed = new HTTPRPC(this /* or "http://192.168.2.60"*/);
 
-        LEDStatus1 = new RPCVariable<Character>(mbed, "RemoteLEDStatus1"); // won't work with bool
-        CommsOpenFlag = (LEDStatus1.read_char() >> 4) & 0x01;
+        LEDStatus = new RPCVariable<Integer>(mbed, "RemoteLEDStatus");
+        int ledStatusI = LEDStatus.read_int();
+        System.out.format("LEDStatus %04X\n", ledStatusI);
+        CommsOpenFlag = (ledStatusI >> 12) & 0x01;
 
         if (CommsOpenFlag == 0) {
             CtrlAction = new RPCVariable<Integer>(mbed, "RemoteCtrlAction");
             CtrlAction.write(0x01); // 01=Set Remote Comms Open/Active
             comms_active = 1;
 
-            LEDStatus0 = new RPCVariable<Character>(mbed, "RemoteLEDStatus0");
             SynthFrequencyActual = new RPCVariable<Integer>(mbed, "RemoteSynthFrequencyActual");
             SynthFrequencyUpdate = new RPCVariable<Integer>(mbed, "RemoteSynthFrequencyUpdate");
             AttenuatorActual = new RPCVariable<Integer>(mbed, "RemoteAttenuatorActual");
@@ -291,15 +291,17 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     // *
     public void get_data() {
 
-        int LEDStatus0_i = LEDStatus0.read_char();
-        int LEDStatus1_i = LEDStatus1.read_char();
+        int LEDStatus_i = LEDStatus.read_int();
 
-        SynthLockLED_i = ((LEDStatus0_i >> 2) & 0x00000001);
-        frontPanelControlled = (LEDStatus0_i & 0x10) != 0;
-        PSU1Alarm_i = ((LEDStatus0_i >> 7) & 0x00000001);
-        SynthType_i = ((LEDStatus1_i >> 1) & 0x00000001);
-        AttType_i = ((LEDStatus1_i >> 2) & 0x00000001);
-        SerialAlarm_i = ((LEDStatus1_i >> 3) & 0x00000001);
+        SynthLockLED_i = ((LEDStatus_i >> 2) & 0x00000001);
+        frontPanelControlled = (LEDStatus_i & 0x10) != 0;
+        PSU1Alarm_i = ((LEDStatus_i >> 7) & 0x00000001);
+        SynthType_i = ((LEDStatus_i >> 9) & 0x00000001);
+        AttType_i = ((LEDStatus_i >> 10) & 0x00000001);
+        SerialAlarm_i = ((LEDStatus_i >> 11) & 0x00000001);
+
+        System.out.format("LEDStatus %04X SynthLockLED_i %d, frontPanelControlled %s, PSU1Alarm_i %d, SynthType_i %d, AttType_i %d, SerialAlarm_i %d\n",
+                LEDStatus_i, SynthLockLED_i, Boolean.toString(frontPanelControlled), PSU1Alarm_i, SynthType_i, AttType_i, SerialAlarm_i);
 
         if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
