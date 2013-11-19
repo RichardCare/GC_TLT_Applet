@@ -70,7 +70,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     int A_INCx = 4; // increment value in bits
     int A_INCxx = 40; // increment value in bits
     int ATT_MIN = 0;
-    int ATT_MAX;
+    int attenuationMax;
 
     int CtrlStatusData = 0;
     int CommsOpenFlag = 0;
@@ -245,12 +245,6 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
             System.out.format("Synth frequency: actual = %d, limits: min = %d  max = %d\n",
                             SynthFrequency, SYNTH_FREQ_MIN, SYNTH_FREQ_MAX);
-
-            if (AttType_i < 1) {
-                ATT_MAX = 127;
-            } else {
-                ATT_MAX = 255;
-            }
         } else {
             comms_active = 0;
         }
@@ -300,19 +294,23 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         AttType_i = ((LEDStatus_i >> 10) & 0x00000001);
         SerialAlarm_i = ((LEDStatus_i >> 11) & 0x00000001);
 
-        System.out.format("LEDStatus %04X SynthLockLED_i %d, frontPanelControlled %s, PSU1Alarm_i %d, SynthType_i %d, AttType_i %d, SerialAlarm_i %d\n",
-                LEDStatus_i, SynthLockLED_i, Boolean.toString(frontPanelControlled), PSU1Alarm_i, SynthType_i, AttType_i, SerialAlarm_i);
-
         if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
         }
+
+        attenuationMax = AttType_i < 1 ? 127 : 255;
 
         ipAddrField.setEnabled(!frontPanelControlled);
         ipMaskField.setEnabled(!frontPanelControlled);
         ipSet.setEnabled(!frontPanelControlled);
         setIpTextField(ipAddrField, ipAddrRpc);
         setIpTextField(ipMaskField, ipMaskRpc);
+
+        System.out.format("LEDStatus %04X SynthLockLED_i %d, frontPanelControlled %s, PSU1Alarm_i %d, SynthType_i %d, AttType_i %d, SerialAlarm_i %d\n" +
+                "SynthFrequency %d, Attenuation %d, attenuationMax %d\n", 
+                LEDStatus_i, SynthLockLED_i, Boolean.toString(frontPanelControlled), PSU1Alarm_i, SynthType_i, AttType_i, SerialAlarm_i,
+                SynthFrequency, Attenuation, attenuationMax);
     }
 
     // **************************************************************************
@@ -474,8 +472,8 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             }
             if (evt.getSource() == AttInc_ALBtn) {
                 Attenuation = Attenuation + A_INC;
-                if (Attenuation >= ATT_MAX) {
-                    Attenuation = ATT_MAX;
+                if (Attenuation >= attenuationMax) {
+                    Attenuation = attenuationMax;
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
@@ -492,8 +490,8 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             }
             if (evt.getSource() == AttIncx_ALBtn) {
                 Attenuation = Attenuation + A_INCx;
-                if (Attenuation >= ATT_MAX) {
-                    Attenuation = ATT_MAX;
+                if (Attenuation >= attenuationMax) {
+                    Attenuation = attenuationMax;
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
@@ -510,8 +508,8 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             }
             if (evt.getSource() == AttIncxx_ALBtn) {
                 Attenuation = Attenuation + A_INCxx;
-                if (Attenuation >= ATT_MAX) {
-                    Attenuation = ATT_MAX;
+                if (Attenuation >= attenuationMax) {
+                    Attenuation = attenuationMax;
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
