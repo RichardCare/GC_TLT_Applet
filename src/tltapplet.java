@@ -58,6 +58,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     int SynthType_i = 0;
     int AttType_i = 0;
     int SerialAlarm_i = 0;
+    private boolean ploOscAlarm;
 
     int SynthFrequency;
     int FreqUpdateIcon = 0; // displayed if the frequency has been changed
@@ -111,8 +112,15 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     public void init() {
 
         setLayout(null);
+        String url = getParameter("url");
 
-        mbed = new HTTPRPC(this /* or "http://192.168.2.60"*/);
+        if (url == null) {
+            System.out.println("Applet starting on this");
+            mbed = new HTTPRPC(this);
+        } else {
+            System.out.println("Applet starting on " + url);
+            mbed = new HTTPRPC(url);
+        }
 
         LEDStatus = new RPCVariable<Integer>(mbed, "RemoteLEDStatus");
         int ledStatusI = LEDStatus.read_int();
@@ -288,6 +296,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
 
         int LEDStatus_i = LEDStatus.read_int();
 
+        ploOscAlarm = ((LEDStatus_i >> 1) & 0x00000001) != 0;
         SynthLockLED_i = ((LEDStatus_i >> 2) & 0x00000001);
         frontPanelControlled = (LEDStatus_i & 0x10) != 0;
         isPLO = (LEDStatus_i & 0x20) != 0;
@@ -360,9 +369,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             g.setFont(smallFont);
             g.setColor(Color.black);
             g.drawString("      0.25       1.0        10", 90, 275);
-            if (!isPLO) {
-                g.drawString("Synth Lock Detected", 100, 342);
-            }
+            g.drawString("Osc. Lock Detected", 100, 342);
             g.drawString("PSU Healthy", 100, 391);
 
             g.setFont(bigFont);
@@ -393,11 +400,10 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             g.setColor(Color.orange);
             g.drawRoundRect(LED1_x, LED1_y, LED_dx, LED_dy, LED_r, LED_r);
 
-            if (!isPLO) {
-                // Draw & fill Synth Lock LED
-                g.setColor(SynthLockLED_i >= 1 ? Color.green : Color.red);
-                g.fillRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
-            }
+            // Draw & fill Synth Lock LED
+            boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
+            g.setColor(isAlarm ? Color.red : Color.green);
+            g.fillRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
 
             // Draw PSU1 Alarm LED and fill if alive
             if (PSU1Alarm_i <= 0) {
