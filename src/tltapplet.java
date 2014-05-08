@@ -1,3 +1,6 @@
+import gimbalcom.rpc.RemoteFactory;
+import gimbalcom.rpc.RpcRemoteIntegerFactory;
+
 import java.applet.Applet;
 import java.awt.Button;
 import java.awt.Color;
@@ -11,10 +14,8 @@ import java.awt.event.ActionListener;
 import javax.swing.Timer;
 
 import org.mbed.RPC.HTTPRPC;
-import org.mbed.RPC.RPCVariable;
-import org.mbed.RPC.mbedRPC;
 
-public class tltapplet extends Applet implements mbedRPC, ActionListener {
+public class tltapplet extends Applet implements ActionListener {
 
     HTTPRPC mbed;
     boolean threadSuspended;
@@ -22,18 +23,18 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
     private static final long serialVersionUID = 1L;
 
     // setup local and rpc variables
-    RPCVariable<Integer> CtrlAction;
-    RPCVariable<Integer> LEDStatus;
-    RPCVariable<Integer> SynthFrequencyActual;
-    RPCVariable<Integer> SynthFrequencyUpdate;
-    RPCVariable<Integer> AttenuatorActual;
-    RPCVariable<Integer> AttenuatorUpdate;
+    RemoteFactory.Integer CtrlAction;
+    RemoteFactory.Integer LEDStatus;
+    RemoteFactory.Integer SynthFrequencyActual;
+    RemoteFactory.Integer SynthFrequencyUpdate;
+    RemoteFactory.Integer AttenuatorActual;
+    RemoteFactory.Integer AttenuatorUpdate;
 
-    RPCVariable<Integer> minFrequencyMHz;
-    RPCVariable<Integer> maxFrequencyMHz;
+    RemoteFactory.Integer minFrequencyMHz;
+    RemoteFactory.Integer maxFrequencyMHz;
 
-    RPCVariable<Integer> ipAddrRpc;
-    RPCVariable<Integer> ipMaskRpc;
+    RemoteFactory.Integer ipAddrRpc;
+    RemoteFactory.Integer ipMaskRpc;
 
     // screen position coordinates for drawing LEDs, Btns and text
     int LED1_x = 20;
@@ -122,26 +123,29 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
             mbed = new HTTPRPC(url);
         }
 
-        LEDStatus = new RPCVariable<Integer>(mbed, "RemoteLEDStatus");
+        RemoteFactory factory = new RpcRemoteIntegerFactory(mbed);
+                // Use this for off line experiments: new DummyRemoteIntegerFactory(); 
+
+        LEDStatus = factory.create("RemoteLEDStatus");
         int ledStatusI = LEDStatus.read_int();
         System.out.format("LEDStatus %04X\n", ledStatusI);
         CommsOpenFlag = (ledStatusI >> 12) & 0x01;
 
         if (CommsOpenFlag == 0) {
-            CtrlAction = new RPCVariable<Integer>(mbed, "RemoteCtrlAction");
+            CtrlAction = factory.create("RemoteCtrlAction");
             CtrlAction.write(0x01); // 01=Set Remote Comms Open/Active
             comms_active = 1;
 
-            SynthFrequencyActual = new RPCVariable<Integer>(mbed, "RemoteSynthFrequencyActual");
-            SynthFrequencyUpdate = new RPCVariable<Integer>(mbed, "RemoteSynthFrequencyUpdate");
-            AttenuatorActual = new RPCVariable<Integer>(mbed, "RemoteAttenuatorActual");
-            AttenuatorUpdate = new RPCVariable<Integer>(mbed, "RemoteAttenuatorUpdate");
+            SynthFrequencyActual = factory.create("RemoteSynthFrequencyActual");
+            SynthFrequencyUpdate = factory.create("RemoteSynthFrequencyUpdate");
+            AttenuatorActual = factory.create("RemoteAttenuatorActual");
+            AttenuatorUpdate = factory.create("RemoteAttenuatorUpdate");
 
-            minFrequencyMHz = new RPCVariable<Integer>(mbed, "RemoteMinFreqMHz");
-            maxFrequencyMHz = new RPCVariable<Integer>(mbed, "RemoteMaxFreqMHz");
+            minFrequencyMHz = factory.create("RemoteMinFreqMHz");
+            maxFrequencyMHz = factory.create("RemoteMaxFreqMHz");
 
-            ipAddrRpc = new RPCVariable<Integer>(mbed, "IPAddr");
-            ipMaskRpc = new RPCVariable<Integer>(mbed, "IPMask");
+            ipAddrRpc = factory.create("IPAddr");
+            ipMaskRpc = factory.create("IPMask");
 
             int rate;
             try {
@@ -539,7 +543,7 @@ public class tltapplet extends Applet implements mbedRPC, ActionListener {
         }
     }
 
-    private void setIpTextField(TextField ipField, RPCVariable<Integer> ipRpc) {
+    private void setIpTextField(TextField ipField, RemoteFactory.Integer ipRpc) {
         // NOTE: Byte order for char[4] read from mbed
         int value = ipRpc.read_int();
         int a = value >>  0 & 0xFF;
