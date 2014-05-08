@@ -408,6 +408,7 @@ public class tltapplet extends Applet implements ActionListener {
             boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
             g.setColor(isAlarm ? Color.red : Color.green);
             g.fillRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
+            g.drawRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
 
             // Draw PSU1 Alarm LED and fill if alive
             if (PSU1Alarm_i <= 0) {
