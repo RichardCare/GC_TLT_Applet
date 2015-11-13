@@ -30,8 +30,8 @@ package org.mbed.RPC;
  *
  */
 public class RPCVariable<T>{
-private mbed the_mbed;
-private String name;
+private final mbed the_mbed;
+private final String name;
 	/**
 	 * This constructor creates an instance which will control a ValuePass object which has already been created on the mbed
 	 * <br>
@@ -90,6 +90,9 @@ private String name;
 		String response = the_mbed.RPC(name, "read", null);
 		//Need to convert response to an int and return
 		if(response != null){
+		    if (response.startsWith("read ")) {
+		        response = response.substring(5);
+		    }
 			int result = Integer.parseInt(response);
 			return(result);
 		}else{

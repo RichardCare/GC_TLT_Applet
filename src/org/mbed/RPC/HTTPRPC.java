@@ -1,9 +1,13 @@
 package org.mbed.RPC;
 
-import java.net.*;
-import java.security.AccessControlException;
-import java.io.*;
 import java.applet.Applet;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.security.AccessControlException;
 /**
  *  This class is used to create an object which can communicate using RPC to an mbed Connected over HTTP
  *  
@@ -60,7 +64,8 @@ BufferedReader from_mbed = null;
 	/**
 	 * {@inheritDoc}
 	 */
-	public String RPC(String Name, String Method, String[] Args){
+	@Override
+    public String RPC(String Name, String Method, String[] Args){
 		//Execute RPC GET command and get result back
 		String Response;
 		String Arguments = "";
@@ -76,7 +81,7 @@ BufferedReader from_mbed = null;
 		try{
 			mbedAddr = new URL(Address + Command);
 	        BufferedReader from_mbed = new BufferedReader(new InputStreamReader(mbedAddr.openStream()));
-	        
+	        waitForResponse(from_mbed);
 	       if(from_mbed.ready() == true){
 	    	   Response = from_mbed .readLine();
 	    	   //System.out.println(Response);
@@ -99,10 +104,26 @@ BufferedReader from_mbed = null;
 		
 		return(Response);
 	}
-	/**
+	
+    private void waitForResponse(BufferedReader response) throws IOException {
+        int i = 0;
+        try {
+            for (i = 0; i < 10 && !response.ready(); i++) {
+                Thread.sleep(50);
+            }
+        } catch (InterruptedException e) {
+            // quietly ignore - but stop now
+        }
+// Useful as measure of speed of mbed response
+//        if (i != 0)
+//            System.out.println("Iters waited:" + i);
+    }
+	
+    /**
 	 * {@inheritDoc}
 	 */
-	public void delete(){
+	@Override
+    public void delete(){
 		//close the HTTP connection
 		try{
 			from_mbed.close();
