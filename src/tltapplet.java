@@ -86,6 +86,9 @@ public class tltapplet extends Applet implements ActionListener {
 
     // Button Inactive_ALBtn;
 
+    Font smallFont = new Font("Arial", Font.PLAIN, 13);
+    Font bigFont = new Font("Arial", Font.PLAIN, 32);
+
     Button LocalActive_ALBtn;
     Button Enter_ALBtn;
     Button Enter2_ALBtn;
@@ -98,7 +101,10 @@ public class tltapplet extends Applet implements ActionListener {
     Button AttIncxx_ALBtn;
     Button AttDecxx_ALBtn;
     Button Refresh_ALBtn;
-
+    
+    Label synthValueLabel = new Label("unknown");
+    Label attnValueLabel = new Label("unknown");
+    
     Label ipAddrLabel = new Label("IP Address");
     TextField ipAddrField = new TextField(20);
     Label ipMaskLabel = new Label("IP Mask");
@@ -181,6 +187,30 @@ public class tltapplet extends Applet implements ActionListener {
             AttDecx_ALBtn.setBounds(160, 280, 30, 20);
             AttIncxx_ALBtn.setBounds(210, 240, 30, 20);
             AttDecxx_ALBtn.setBounds(210, 280, 30, 20);
+
+            Label attValsLabel = new Label("      0.25       1.0        10");
+            attValsLabel.setFont(smallFont);
+            attValsLabel.setBounds(88, 260, 150, 20);
+            add(attValsLabel);
+            
+            Label oscLockLabel = new Label("Osc. Lock Detected");
+            oscLockLabel.setFont(smallFont);
+            oscLockLabel.setBounds(100, 325, 120, 20);
+            add(oscLockLabel);
+            
+            Label psuHealthyLabel = new Label("PSU Healthy");
+            psuHealthyLabel.setFont(smallFont);
+            psuHealthyLabel.setBounds(100, 375, 100, 20);
+            add(psuHealthyLabel);
+            
+            synthValueLabel.setFont(bigFont);
+            synthValueLabel.setBounds(35, 60, 200, 40);
+            add(synthValueLabel);
+
+            attnValueLabel.setFont(bigFont);
+            attnValueLabel.setBounds(35, 170, 200, 40);
+            add(attnValueLabel);
+            
             Refresh_ALBtn.setBounds(20, 420, 220, 30);
 
             ipAddrLabel.setBounds(40, 470, 70, 20);
@@ -313,6 +343,8 @@ public class tltapplet extends Applet implements ActionListener {
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
         }
+
+        updateSynthLabel();
         
         Enter_ALBtn.setVisible(!isPLO);
         Increase_ALBtn.setVisible(!isPLO);
@@ -320,6 +352,8 @@ public class tltapplet extends Applet implements ActionListener {
 
         attenuationMax = AttType_i < 1 ? 127 : 255;
 
+        updateAttenuationLabel();
+        
         ipAddrField.setEnabled(!frontPanelControlled);
         ipMaskField.setEnabled(!frontPanelControlled);
         ipSet.setEnabled(!frontPanelControlled);
@@ -330,6 +364,17 @@ public class tltapplet extends Applet implements ActionListener {
                 "SynthFrequency %d, Attenuation %d, attenuationMax %d\n", 
                 LEDStatus_i, SynthLockLED_i, Boolean.toString(frontPanelControlled), PSU1Alarm_i, SynthType_i, AttType_i, SerialAlarm_i,
                 SynthFrequency, Attenuation, attenuationMax);
+    }
+
+    private void updateSynthLabel() {
+        synthValueLabel.setText(SerialAlarm_i != 0 ?
+                "Synth ALM" :
+                String.format("%4d  MHz %s", SynthFrequency, FreqUpdateIcon >= 1 ? "X" : ""));
+    }
+
+    private void updateAttenuationLabel() {
+        attnValueLabel.setText(
+                String.format("%4.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
     }
 
     // **************************************************************************
@@ -366,34 +411,8 @@ public class tltapplet extends Applet implements ActionListener {
         g.setColor(Color.blue);
         g.drawRoundRect(1, 1, 260, 590, 20, 20);
 
-        Font smallFont = new Font("Arial", Font.PLAIN, 13);
-        Font bigFont = new Font("Arial", Font.PLAIN, 32);
 
         if (comms_active == 1) {
-            g.setFont(smallFont);
-            g.setColor(Color.black);
-            g.drawString("      0.25       1.0        10", 90, 275);
-            g.drawString("Osc. Lock Detected", 100, 342);
-            g.drawString("PSU Healthy", 100, 391);
-
-            g.setFont(bigFont);
-            g.setColor(Color.black);
-            if (SerialAlarm_i >= 1) {
-                g.drawString("Synth ALM", 35, 96);
-            } else {
-                g.drawString(String.valueOf(SynthFrequency), 35, 96);
-                g.drawString("MHz", 140, 96);
-                if (FreqUpdateIcon >= 1) {
-                    g.drawString("X", 225, 96);
-                }
-            }
-
-            g.drawString(String.valueOf(Attenuation * 0.25), 35, 216);
-            g.drawString("dB", 140, 216);
-            if (AttUpdateIcon >= 1) {
-                g.drawString("X", 225, 216);
-            }
-
             // Draw Local/Remote LED and fill if active
             if (!frontPanelControlled) {
                 g.setColor(Color.orange);
@@ -456,7 +475,7 @@ public class tltapplet extends Applet implements ActionListener {
                 AttUpdateIcon = 0;
                 update_ctr = 0;
                 get_data();
-                repaint();
+                updateSynthLabel();
             }
             if (evt.getSource() == Enter2_ALBtn) {
                 SynthFrequencyUpdate.write(SynthFrequency);
@@ -467,7 +486,7 @@ public class tltapplet extends Applet implements ActionListener {
                 FreqUpdateIcon = 0;
                 update_ctr = 0;
                 get_data();
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == Increase_ALBtn) {
                 SynthFrequency = SynthFrequency + F_INC;
@@ -476,7 +495,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 FreqUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateSynthLabel();
             }
             if (evt.getSource() == Decrease_ALBtn) {
                 SynthFrequency = SynthFrequency - F_INC;
@@ -485,7 +504,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 FreqUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateSynthLabel();
             }
             if (evt.getSource() == AttInc_ALBtn) {
                 Attenuation = Attenuation + A_INC;
@@ -494,7 +513,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == AttDec_ALBtn) {
                 Attenuation = Attenuation - A_INC;
@@ -503,7 +522,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == AttIncx_ALBtn) {
                 Attenuation = Attenuation + A_INCx;
@@ -512,7 +531,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == AttDecx_ALBtn) {
                 Attenuation = Attenuation - A_INCx;
@@ -521,7 +540,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == AttIncxx_ALBtn) {
                 Attenuation = Attenuation + A_INCxx;
@@ -530,7 +549,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
             if (evt.getSource() == AttDecxx_ALBtn) {
                 Attenuation = Attenuation - A_INCxx;
@@ -539,7 +558,7 @@ public class tltapplet extends Applet implements ActionListener {
                 }
                 AttUpdateIcon = 1;
                 update_ctr = 0;
-                repaint();
+                updateAttenuationLabel();
             }
         }
     }
