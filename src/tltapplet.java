@@ -31,13 +31,14 @@ public class tltapplet extends Applet implements ActionListener {
         private static final long serialVersionUID = 1L;
         private int radius;
         private Color ledColor = getBackground();
+        private Color borderColor = getBackground();
 
         @Override
         public void paint( Graphics g) {
             Dimension sz = getSize();
             g.setColor(ledColor);
             g.fillRoundRect(1, 1, sz.width-2, sz.height-2, radius, radius);
-            g.setColor(getForeground());
+            g.setColor(borderColor);
             g.drawRoundRect(0, 0, sz.width-1, sz.height-1, radius, radius);
         }
         
@@ -48,6 +49,13 @@ public class tltapplet extends Applet implements ActionListener {
         public void setLedColor(Color value) {
             boolean changed = ledColor != value;
             ledColor = value;
+            if (changed)
+                repaint();
+        }
+        
+        public void setBorderColor(Color value) {
+            boolean changed = borderColor != value;
+            borderColor = value;
             if (changed)
                 repaint();
         }
@@ -144,6 +152,7 @@ public class tltapplet extends Applet implements ActionListener {
     
     Label synthValueLabel = new Label("unknown");
     Label attnValueLabel = new Label("unknown");
+    Label connectionCounterLabel = new Label();
     
     Label ipAddrLabel = new Label("IP Address");
     TextField ipAddrField = new TextField(20);
@@ -176,6 +185,14 @@ public class tltapplet extends Applet implements ActionListener {
         int ledStatusI = LEDStatus.read_int();
         System.out.format("LEDStatus %04X\n", ledStatusI);
         CommsOpenFlag = (ledStatusI >> 12) & 0x01;
+        
+        LedPanel container = new LedPanel();
+        container.setLayout(null);
+        container.setRadius(20);
+        container.setBounds(1, 1, 260, 590);
+        container.setBorderColor(Color.BLUE);
+        container.setLedColor(Color.WHITE);
+        add(container);
 
         if (CommsOpenFlag == 0) {
             CtrlAction = factory.create("RemoteCtrlAction");
@@ -231,43 +248,48 @@ public class tltapplet extends Applet implements ActionListener {
             Label attValsLabel = new Label("      0.25       1.0        10");
             attValsLabel.setFont(smallFont);
             attValsLabel.setBounds(88, 260, 150, 20);
-            add(attValsLabel);
+            container.add(attValsLabel);
             
             Label oscLockLabel = new Label("Osc. Lock Detected");
             oscLockLabel.setFont(smallFont);
             oscLockLabel.setBounds(100, 325, 120, 20);
-            add(oscLockLabel);
+            container.add(oscLockLabel);
             
             Label psuHealthyLabel = new Label("PSU Healthy");
             psuHealthyLabel.setFont(smallFont);
             psuHealthyLabel.setBounds(100, 375, 100, 20);
-            add(psuHealthyLabel);
+            container.add(psuHealthyLabel);
             
             synthValueLabel.setFont(bigFont);
             synthValueLabel.setBounds(35, 60, 200, 40);
-            add(synthValueLabel);
+            container.add(synthValueLabel);
 
             attnValueLabel.setFont(bigFont);
             attnValueLabel.setBounds(35, 170, 200, 40);
-            add(attnValueLabel);
+            container.add(attnValueLabel);
+            
+            connectionCounterLabel.setFont(smallFont);
+            connectionCounterLabel.setBounds(270, 570, 30, 20);
+            connectionCounterLabel.setForeground(Color.GRAY);
+            add(connectionCounterLabel);
             
             // Local/remote LED
             localRemoteLed.setRadius(LED_r);
             localRemoteLed.setBounds(LED1_x, LED1_y, LED_dx, LED_dy);
-            localRemoteLed.setForeground(Color.ORANGE);
-            add(localRemoteLed);
+            localRemoteLed.setBorderColor(Color.ORANGE);
+            container.add(localRemoteLed);
             
             // Synth Lock LED
             synthLockLed.setRadius(LED_r);
             synthLockLed.setBounds(LED1_x, LED5_y, LED_dx, LED_dy);
-            synthLockLed.setForeground(Color.BLACK);
-            add(synthLockLed);
+            synthLockLed.setBorderColor(Color.BLACK);
+            container.add(synthLockLed);
             
             // PSU alarm LED
             psuAlarmLed.setRadius(LED_r);
             psuAlarmLed.setBounds(LED1_x, LED6_y, LED_dx, LED_dy);
-            psuAlarmLed.setForeground(Color.GREEN);
-            add(psuAlarmLed);
+            psuAlarmLed.setBorderColor(Color.GREEN);
+            container.add(psuAlarmLed);
             
             Refresh_ALBtn.setBounds(20, 420, 220, 30);
 
@@ -280,24 +302,24 @@ public class tltapplet extends Applet implements ActionListener {
             ipSet.setBounds(160, 530, 60, 20);
             ipErrorLabel.setBounds(20, 560, 220, 20);
 
-            add(LocalActive_ALBtn);
-            add(Enter_ALBtn);
-            add(Enter2_ALBtn);
-            add(Increase_ALBtn);
-            add(Decrease_ALBtn);
-            add(AttInc_ALBtn);
-            add(AttDec_ALBtn);
-            add(AttIncx_ALBtn);
-            add(AttDecx_ALBtn);
-            add(AttIncxx_ALBtn);
-            add(AttDecxx_ALBtn);
-            add(Refresh_ALBtn);
-            add(ipAddrLabel);
-            add(ipAddrField);
-            add(ipMaskLabel);
-            add(ipMaskField);
-            add(ipErrorLabel);
-            add(ipSet);
+            container.add(LocalActive_ALBtn);
+            container.add(Enter_ALBtn);
+            container.add(Enter2_ALBtn);
+            container.add(Increase_ALBtn);
+            container.add(Decrease_ALBtn);
+            container.add(AttInc_ALBtn);
+            container.add(AttDec_ALBtn);
+            container.add(AttIncx_ALBtn);
+            container.add(AttDecx_ALBtn);
+            container.add(AttIncxx_ALBtn);
+            container.add(AttDecxx_ALBtn);
+            container.add(Refresh_ALBtn);
+            container.add(ipAddrLabel);
+            container.add(ipAddrField);
+            container.add(ipMaskLabel);
+            container.add(ipMaskField);
+            container.add(ipErrorLabel);
+            container.add(ipSet);
 
             LocalActive_ALBtn.addActionListener(this);
             Enter_ALBtn.addActionListener(this);
@@ -348,6 +370,17 @@ public class tltapplet extends Applet implements ActionListener {
                             SynthFrequency, SYNTH_FREQ_MIN, SYNTH_FREQ_MAX);
         } else {
             comms_active = 0;
+            
+            // All is not well with the world
+            Label inactiveLabel1 = new Label("Connection Error:");
+            inactiveLabel1.setFont(smallFont);
+            inactiveLabel1.setBounds(50, 80, 120, 20);
+            container.add(inactiveLabel1);
+
+            Label inactiveLabel2 = new Label("Comms Already In Use");
+            inactiveLabel2.setFont(smallFont);
+            inactiveLabel2.setBounds(50, 100, 150, 20);
+            container.add(inactiveLabel2);
         }
     }
 
@@ -403,7 +436,7 @@ public class tltapplet extends Applet implements ActionListener {
         // 'Light the LED' good or bad
         boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
         Color c = isAlarm ? Color.red : Color.green;
-        synthLockLed.setForeground(c);
+        synthLockLed.setBorderColor(c);
         synthLockLed.setLedColor(c);
         
         // 'Light the LED' green if the PSU is OK
@@ -458,6 +491,8 @@ public class tltapplet extends Applet implements ActionListener {
             if (connection_ctr >= 999) {
                 connection_ctr = 0;
             }
+            connectionCounterLabel.setText(String.valueOf(connection_ctr));
+            
             // get_data();
             if ((FreqUpdateIcon == 1) | (AttUpdateIcon == 1)) {
                 update_ctr = update_ctr + 1;
@@ -469,30 +504,8 @@ public class tltapplet extends Applet implements ActionListener {
                     update_ctr = 0;
                 }
             }
-            repaint();
         }
     };
-
-    // **************************************************************************
-    // * function to setup graphics and paint (empty)
-    // *
-    @Override
-    public void paint(Graphics g) {
-        g.setColor(Color.blue);
-        g.drawRoundRect(1, 1, 260, 590, 20, 20);
-
-
-        if (comms_active == 1) {
-            g.setColor(Color.gray);
-            g.setFont(smallFont);
-            g.drawString(String.valueOf(connection_ctr), 270, 590);
-        } else {
-            g.setFont(smallFont);
-            g.setColor(Color.black);
-            g.drawString("Connection Error:", 50, 80);
-            g.drawString("Comms Already In Use", 50, 100);
-        }
-    }
 
     // Here we ask which component called this method
     @Override
@@ -501,12 +514,10 @@ public class tltapplet extends Applet implements ActionListener {
             CtrlAction.write(0x03); // LR on
             CtrlAction.write(0x04); // LR off
             get_data();
-            repaint();
         }
 
         if (evt.getSource() == Refresh_ALBtn) {
             get_data();
-            repaint();
         }
 
         if (!frontPanelControlled) {
