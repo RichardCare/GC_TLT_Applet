@@ -4,9 +4,11 @@ import gimbalcom.rpc.RpcRemoteIntegerFactory;
 import java.applet.Applet;
 import java.awt.Button;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Label;
+import java.awt.Panel;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -16,6 +18,40 @@ import javax.swing.Timer;
 import org.mbed.RPC.HTTPRPC;
 
 public class tltapplet extends Applet implements ActionListener {
+    
+    /**
+     * Small class to draw rounded rectangles as an 'LED'
+     * Note use of LedColor (as opposed to BackgroundColor) as I haven't been smart enough to work out how to stop Panel
+     * painting (hence leave BackgroundColor alone).
+     * Also use of ForegroundColor as border of the LED.
+     * 
+     * Being a UI component, changing LedColor repaints if necessary.
+     */
+    public class LedPanel extends Panel {
+        private static final long serialVersionUID = 1L;
+        private int radius;
+        private Color ledColor = getBackground();
+
+        @Override
+        public void paint( Graphics g) {
+            Dimension sz = getSize();
+            g.setColor(ledColor);
+            g.fillRoundRect(1, 1, sz.width-2, sz.height-2, radius, radius);
+            g.setColor(getForeground());
+            g.drawRoundRect(0, 0, sz.width-1, sz.height-1, radius, radius);
+        }
+        
+        public void setRadius(int value) {
+            radius = value;
+        }
+        
+        public void setLedColor(Color value) {
+            boolean changed = ledColor != value;
+            ledColor = value;
+            if (changed)
+                repaint();
+        }
+    }
 
     HTTPRPC mbed;
     boolean threadSuspended;
@@ -101,6 +137,10 @@ public class tltapplet extends Applet implements ActionListener {
     Button AttIncxx_ALBtn;
     Button AttDecxx_ALBtn;
     Button Refresh_ALBtn;
+    
+    LedPanel localRemoteLed = new LedPanel();
+    LedPanel synthLockLed = new LedPanel();
+    LedPanel psuAlarmLed = new LedPanel();
     
     Label synthValueLabel = new Label("unknown");
     Label attnValueLabel = new Label("unknown");
@@ -210,6 +250,24 @@ public class tltapplet extends Applet implements ActionListener {
             attnValueLabel.setFont(bigFont);
             attnValueLabel.setBounds(35, 170, 200, 40);
             add(attnValueLabel);
+            
+            // Local/remote LED
+            localRemoteLed.setRadius(LED_r);
+            localRemoteLed.setBounds(LED1_x, LED1_y, LED_dx, LED_dy);
+            localRemoteLed.setForeground(Color.ORANGE);
+            add(localRemoteLed);
+            
+            // Synth Lock LED
+            synthLockLed.setRadius(LED_r);
+            synthLockLed.setBounds(LED1_x, LED5_y, LED_dx, LED_dy);
+            synthLockLed.setForeground(Color.BLACK);
+            add(synthLockLed);
+            
+            // PSU alarm LED
+            psuAlarmLed.setRadius(LED_r);
+            psuAlarmLed.setBounds(LED1_x, LED6_y, LED_dx, LED_dy);
+            psuAlarmLed.setForeground(Color.GREEN);
+            add(psuAlarmLed);
             
             Refresh_ALBtn.setBounds(20, 420, 220, 30);
 
@@ -339,6 +397,18 @@ public class tltapplet extends Applet implements ActionListener {
         AttType_i = ((LEDStatus_i >> 10) & 0x00000001);
         SerialAlarm_i = ((LEDStatus_i >> 11) & 0x00000001);
 
+        // 'Light the LED' orange if web UI has control
+        localRemoteLed.setLedColor(frontPanelControlled ? Color.white : Color.orange);
+        
+        // 'Light the LED' good or bad
+        boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
+        Color c = isAlarm ? Color.red : Color.green;
+        synthLockLed.setForeground(c);
+        synthLockLed.setLedColor(c);
+        
+        // 'Light the LED' green if the PSU is OK
+        psuAlarmLed.setLedColor(PSU1Alarm_i != 0 ? Color.green : Color.white);
+
         if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
@@ -413,32 +483,6 @@ public class tltapplet extends Applet implements ActionListener {
 
 
         if (comms_active == 1) {
-            // Draw Local/Remote LED and fill if active
-            if (!frontPanelControlled) {
-                g.setColor(Color.orange);
-            } else {
-                g.setColor(Color.white);
-            }
-            g.fillRoundRect(LED1_x, LED1_y, LED_dx, LED_dy, LED_r, LED_r);
-            g.setColor(Color.orange);
-            g.drawRoundRect(LED1_x, LED1_y, LED_dx, LED_dy, LED_r, LED_r);
-
-            // Draw & fill Synth Lock LED
-            boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
-            g.setColor(isAlarm ? Color.red : Color.green);
-            g.fillRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
-            g.drawRoundRect(LED1_x, LED5_y, LED_dx, LED_dy, LED_r, LED_r);
-
-            // Draw PSU1 Alarm LED and fill if alive
-            if (PSU1Alarm_i <= 0) {
-                g.setColor(Color.green);
-            } else {
-                g.setColor(Color.white);
-            }
-            g.fillRoundRect(LED1_x, LED6_y, LED_dx, LED_dy, LED_r, LED_r);
-            g.setColor(Color.green);
-            g.drawRoundRect(LED1_x, LED6_y, LED_dx, LED_dy, LED_r, LED_r);
-
             g.setColor(Color.gray);
             g.setFont(smallFont);
             g.drawString(String.valueOf(connection_ctr), 270, 590);
