@@ -65,10 +65,7 @@ public class tltapplet extends Applet {
     // Constants
     private static final long serialVersionUID = 1L;
     
-    // screen position coordinates for drawing LEDs, Btns and text
-    private static final int LED1_y = 21;
-    private static final int LED2_y = 321;
-    private static final int LED3_y = 371;
+    // screen position coordinates for drawing LEDs, buttons and text
     private static final int LED_x = 20;
     private static final int LED_dx = 40;
     private static final int LED_dy = 28;
@@ -103,6 +100,8 @@ public class tltapplet extends Applet {
 
     private RemoteFactory.Integer ipAddrRpc;
     private RemoteFactory.Integer ipMaskRpc;
+
+    private boolean isAttenuatorOnlyMode;
 
     private boolean frontPanelControlled = false;
 
@@ -162,12 +161,13 @@ public class tltapplet extends Applet {
         LEDStatus = factory.create("RemoteLEDStatus");
         int ledStatusI = LEDStatus.read_int();
         System.out.format("LEDStatus %04X\n", ledStatusI);
-        isCommsAvailable = ((ledStatusI >> 12) & 0x01) == 0;
+        isCommsAvailable = (ledStatusI & 0x01000) == 0;
+        isAttenuatorOnlyMode = (ledStatusI & 0x02000) != 0;
         
         LedPanel container = new LedPanel();
         container.setLayout(null);
         container.setRadius(20);
-        container.setBounds(1, 1, 260, 590);
+        container.setBounds(1, 1, 260, isAttenuatorOnlyMode ? 480 : 590);
         container.setBorderColor(Color.BLUE);
         container.setLedColor(Color.WHITE);
         add(container);
@@ -199,68 +199,85 @@ public class tltapplet extends Applet {
 
             // ======== Create & initialise UI components - roughly in y, x order ========
             // Top row - local/remote LED & button
-            localRemoteLed = initLed(LED1_y, Color.ORANGE, container);
+            localRemoteLed = initLed(21, Color.ORANGE, container);
             initButton(80, 20, 160, 30, "Local / Remote", container, event -> {
                 CtrlAction.write(0x03); // LR on
                 CtrlAction.write(0x04); // LR off
                 get_data();
             });
 
-            // 2nd row - synth frequency
-            synthValueLabel = initLabel(35, 60, 200, 40, bigFont, "unknown", container);
-            
-            // 3rd row - enter, inc & dec buttons for frequency
-            Enter_ALBtn = initButton(20, 120, 60, 30, "Enter", container, event -> {
-                enterAction();
-                updateSynthLabel();
-            });
-            Increase_ALBtn = initButton(100, 120, 60, 30, "Inc", container, event -> {
-                amendFrequencyAction(F_INC);
-            });
-            Decrease_ALBtn = initButton(180, 120, 60, 30, "Dec", container, event -> {
-                amendFrequencyAction(-F_INC);
-            });
+            int yPosn = 70; // position to draw rows at.....
+            // No synth frequency & change buttons if attenuator only mode
+            if (!isAttenuatorOnlyMode) {
+                // 2nd row - synth frequency
+                synthValueLabel = initLabel(35, 70, 200, 40, bigFont, "unknown", container);
+                
+                // 3rd row - enter, inc & dec buttons for frequency
+                Enter_ALBtn = initButton(20, 120, 60, 30, "Enter", container, event -> {
+                    enterAction();
+                    updateSynthLabel();
+                });
+                Increase_ALBtn = initButton(100, 120, 60, 30, "Inc", container, event -> {
+                    amendFrequencyAction(F_INC);
+                });
+                Decrease_ALBtn = initButton(180, 120, 60, 30, "Dec", container, event -> {
+                    amendFrequencyAction(-F_INC);
+                });
+
+                yPosn = 180;    // allow space for synth info
+            }
 
             // 4th row - attenuation level
-            attnValueLabel = initLabel(35, 170, 200, 40, bigFont, "unknown", container);
+            attnValueLabel = initLabel(35, yPosn, 200, 40, bigFont, "unknown", container);
             
             // 5th row - enter, inc & dec buttons for attenuation
-            initButton(20, 240, 60, 60, "Enter", container, event -> {
+            yPosn += 50; 
+            initButton(20, yPosn, 60, 60, "Enter", container, event -> {
                 enterAction();
                 updateAttenuationLabel();
             });
 
-            initButton(110, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INC));
-            initButton(160, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INCx));
-            initButton(210, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INCxx));
-            initLabel(88, 260, 150, 20, smallFont, "      0.25       1.0        10", container);
-            initButton(110, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INC));
-            initButton(160, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCx));
-            initButton(210, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCxx));
+            initButton(110, yPosn, 30, 20, "^", container, event -> amendAttenuationAction(A_INC));
+            initButton(160, yPosn, 30, 20, "^", container, event -> amendAttenuationAction(A_INCx));
+            initButton(210, yPosn, 30, 20, "^", container, event -> amendAttenuationAction(A_INCxx));
+            initLabel(88, yPosn + 20, 150, 20, smallFont, "      0.25       1.0        10", container);
+            initButton(110, yPosn + 40, 30, 20, "v", container, event -> amendAttenuationAction(-A_INC));
+            initButton(160, yPosn + 40, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCx));
+            initButton(210, yPosn + 40, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCxx));
 
             // 6th row - oscillator lock
-            synthLockLed = initLed(LED2_y, Color.BLACK, container);
-            initLabel(100, 325, 120, 20, smallFont, "Osc. Lock Detected", container);
+            yPosn += 95;
+            if (isAttenuatorOnlyMode) {
+                initButton(100, yPosn, 60, 30, "Mute", container, event -> muteAction());
+            } else {
+                synthLockLed = initLed(yPosn - 4, Color.BLACK, container);
+                initLabel(100, yPosn, 120, 20, smallFont, "Osc. Lock Detected", container);
+            }
 
             // 7th row - PSU OK
-            psuAlarmLed = initLed(LED3_y, Color.GREEN, container);
-            initLabel(100, 375, 100, 20, smallFont, "PSU Healthy", container);
+            yPosn += 50;
+            psuAlarmLed = initLed(yPosn - 4, Color.GREEN, container);
+            initLabel(100, yPosn, 100, 20, smallFont, "PSU Healthy", container);
 
             // 8th row - button to update data from mbed
-            initButton(20, 420, 220, 30, "Update Connection Data", container, event -> get_data());
+            yPosn += 45;
+            initButton(20, yPosn, 220, 30, "Update Connection Data", container, event -> get_data());
 
             // 9th row - IP address
-            initLabel(40, 470, 70, 20, smallFont, "IP Address", container);
-            ipAddrField.setBounds(110, 470, 120, 20);
+            yPosn += 50;
+            initLabel(40, yPosn, 70, 20, smallFont, "IP Address", container);
+            ipAddrField.setBounds(110, yPosn, 120, 20);
             container.add(ipAddrField);
 
             // 10 row - IP mask
-            initLabel(40, 500, 70, 20, smallFont, "IP Mask", container);
-            ipMaskField.setBounds(110, 500, 120, 20);
+            yPosn += 30;
+            initLabel(40, yPosn, 70, 20, smallFont, "IP Mask", container);
+            ipMaskField.setBounds(110, yPosn, 120, 20);
             container.add(ipMaskField);
 
             // 11th row - update IP button (with action)
-            ipSet = initButton(160, 530, 60, 20, "Update IP", container, event -> {
+            yPosn += 30;
+            ipSet = initButton(160, yPosn, 60, 20, "Update IP", container, event -> {
                 try {
                     int addr = ipIntFromTextField(ipAddrField);
                     int mask = ipIntFromTextField(ipMaskField);
@@ -284,10 +301,11 @@ public class tltapplet extends Applet {
             });
 
             // 12th row - place for error text from IP update to display
-            ipErrorLabel = initLabel(20, 560, 220, 20, smallFont, "", container);
+            yPosn += 30;
+            ipErrorLabel = initLabel(20, yPosn, 220, 20, smallFont, "", container);
 
             // Label outside container showing comms count
-            connectionCounterLabel = initLabel(270, 570, 30, 20, smallFont, "", this);
+            connectionCounterLabel = initLabel(270, yPosn, 30, 20, smallFont, "", this);
             connectionCounterLabel.setForeground(Color.GRAY);
             // ======== end of UI layout ========
 
@@ -353,14 +371,20 @@ public class tltapplet extends Applet {
         boolean is8bitAttenuator = ((LEDStatus_i >> 10) & 0x00000001) != 0;
         isSynthAlarm = ((LEDStatus_i >> 11) & 0x00000001) != 0;
 
-        // 'Light the LED' orange if web UI has control
+        // 'Light the local/remote LED' orange if web UI has control
         localRemoteLed.setLedColor(frontPanelControlled ? Color.white : Color.orange);
         
-        // 'Light the LED' good or bad
-        boolean isAlarm = (!isPLO && !synthLocked) || (isPLO && ploOscAlarm);
-        Color c = isAlarm ? Color.red : Color.green;
-        synthLockLed.setBorderColor(c);
-        synthLockLed.setLedColor(c);
+        if (!isAttenuatorOnlyMode) {
+            // 'Light the locked LED' good or bad
+            boolean isAlarm = (!isPLO && !synthLocked) || (isPLO && ploOscAlarm);
+            Color c = isAlarm ? Color.red : Color.green;
+            synthLockLed.setBorderColor(c);
+            synthLockLed.setLedColor(c);
+
+            Enter_ALBtn.setVisible(!isPLO);
+            Increase_ALBtn.setVisible(!isPLO);
+            Decrease_ALBtn.setVisible(!isPLO);
+        }
         
         // 'Light the LED' green if the PSU is OK
         psuAlarmLed.setLedColor(!isPsuAlarm ? Color.green : Color.white);
@@ -372,10 +396,6 @@ public class tltapplet extends Applet {
 
         updateSynthLabel();
         
-        Enter_ALBtn.setVisible(!isPLO);
-        Increase_ALBtn.setVisible(!isPLO);
-        Decrease_ALBtn.setVisible(!isPLO);
-
         attenuationMax = is8bitAttenuator ? 255 : 127;
 
         updateAttenuationLabel();
@@ -479,11 +499,19 @@ public class tltapplet extends Applet {
         get_data();
     }
 
+    private void muteAction() {
+        if (!frontPanelControlled) {
+            CtrlAction.write(8);
+        }
+    }
+
     // Update synth & attenuation label text 
     private void updateSynthLabel() {
-        synthValueLabel.setText(isSynthAlarm ?
-                "Synth ALM" :
-                String.format("%4d  MHz %s", SynthFrequency, showFreqChangedX ? "X" : ""));
+        if (!isAttenuatorOnlyMode) {
+            synthValueLabel.setText(isSynthAlarm ?
+                    "Synth ALM" :
+                        String.format("%4d  MHz %s", SynthFrequency, showFreqChangedX ? "X" : ""));
+        }
     }
 
     private void updateAttenuationLabel() {
