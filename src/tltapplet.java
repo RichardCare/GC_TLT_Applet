@@ -4,6 +4,7 @@ import gimbalcom.rpc.RpcRemoteIntegerFactory;
 import java.applet.Applet;
 import java.awt.Button;
 import java.awt.Color;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -17,7 +18,7 @@ import javax.swing.Timer;
 
 import org.mbed.RPC.HTTPRPC;
 
-public class tltapplet extends Applet implements ActionListener {
+public class tltapplet extends Applet {
     
     /**
      * Small class to draw rounded rectangles as an 'LED'
@@ -81,19 +82,13 @@ public class tltapplet extends Applet implements ActionListener {
     RemoteFactory.Integer ipMaskRpc;
 
     // screen position coordinates for drawing LEDs, Btns and text
-    int LED1_x = 20;
-    int LED2_x = 80;
-    int LED3_x = 140;
-    int LED4_x = 200;
-    int LED1_y = 21;
-    int LED2_y = 191;
-    int LED3_y = 241;
-    int LED4_y = 271;
-    int LED5_y = 321;
-    int LED6_y = 371;
-    int LED_dx = 40;
-    int LED_dy = 28;
-    int LED_r = 6;
+    private static final int LED1_y = 21;
+    private static final int LED2_y = 321;
+    private static final int LED3_y = 371;
+    private static final int LED_x = 20;
+    private static final int LED_dx = 40;
+    private static final int LED_dy = 28;
+    private static final int LED_r = 6;
 
     boolean frontPanelControlled = false;
     boolean isPLO = false;
@@ -128,38 +123,25 @@ public class tltapplet extends Applet implements ActionListener {
     int ipAddr;
     int ipMask;
 
-    // Button Inactive_ALBtn;
-
     Font smallFont = new Font("Arial", Font.PLAIN, 13);
     Font bigFont = new Font("Arial", Font.PLAIN, 32);
 
-    Button LocalActive_ALBtn;
     Button Enter_ALBtn;
-    Button Enter2_ALBtn;
     Button Increase_ALBtn;
     Button Decrease_ALBtn;
-    Button AttInc_ALBtn;
-    Button AttDec_ALBtn;
-    Button AttIncx_ALBtn;
-    Button AttDecx_ALBtn;
-    Button AttIncxx_ALBtn;
-    Button AttDecxx_ALBtn;
-    Button Refresh_ALBtn;
     
-    LedPanel localRemoteLed = new LedPanel();
-    LedPanel synthLockLed = new LedPanel();
-    LedPanel psuAlarmLed = new LedPanel();
+    LedPanel localRemoteLed;
+    LedPanel synthLockLed;
+    LedPanel psuAlarmLed;
     
-    Label synthValueLabel = new Label("unknown");
-    Label attnValueLabel = new Label("unknown");
-    Label connectionCounterLabel = new Label();
+    Label synthValueLabel;
+    Label attnValueLabel;
+    Label connectionCounterLabel;
     
-    Label ipAddrLabel = new Label("IP Address");
     TextField ipAddrField = new TextField(20);
-    Label ipMaskLabel = new Label("IP Mask");
     TextField ipMaskField = new TextField(20);
-    Label ipErrorLabel = new Label();
-    Button ipSet = new Button("Update IP");
+    Label ipErrorLabel;
+    Button ipSet;
 
     // **************************************************************************
     // * function to initialise
@@ -220,144 +202,101 @@ public class tltapplet extends Applet implements ActionListener {
             refresh_timer = new Timer(rate, timerListener);
             refresh_timer.start();
 
-            LocalActive_ALBtn = new Button("Local / Remote");
-            Enter_ALBtn = new Button("Enter");
-            Enter2_ALBtn = new Button("Enter");
-            Increase_ALBtn = new Button("Inc");
-            Decrease_ALBtn = new Button("Dec");
-            AttInc_ALBtn = new Button("^");
-            AttDec_ALBtn = new Button("v");
-            AttIncx_ALBtn = new Button("^");
-            AttDecx_ALBtn = new Button("v");
-            AttIncxx_ALBtn = new Button("^");
-            AttDecxx_ALBtn = new Button("v");
-            Refresh_ALBtn = new Button("Update Connection Data");
+            // ======== Create & initialise UI components - roughly in y, x order ========
+            // Top row - local/remote LED & button
+            localRemoteLed = initLed(LED1_y, Color.ORANGE, container);
+            initButton(80, 20, 160, 30, "Local / Remote", container, event -> {
+                CtrlAction.write(0x03); // LR on
+                CtrlAction.write(0x04); // LR off
+                get_data();
+            });
 
-            LocalActive_ALBtn.setBounds(80, 20, 160, 30);
-            Enter_ALBtn.setBounds(20, 120, 60, 30);
-            Enter2_ALBtn.setBounds(20, 240, 60, 60);
-            Increase_ALBtn.setBounds(100, 120, 60, 30);
-            Decrease_ALBtn.setBounds(180, 120, 60, 30);
-            AttInc_ALBtn.setBounds(110, 240, 30, 20);
-            AttDec_ALBtn.setBounds(110, 280, 30, 20);
-            AttIncx_ALBtn.setBounds(160, 240, 30, 20);
-            AttDecx_ALBtn.setBounds(160, 280, 30, 20);
-            AttIncxx_ALBtn.setBounds(210, 240, 30, 20);
-            AttDecxx_ALBtn.setBounds(210, 280, 30, 20);
+            // 2nd row - synth frequency
+            synthValueLabel = initLabel(35, 60, 200, 40, bigFont, "unknown", container);
+            
+            // 3rd row - enter, inc & dec buttons for frequency
+            Enter_ALBtn = initButton(20, 120, 60, 30, "Enter", container, event -> {
+                enterAction();
+                updateSynthLabel();
+            });
+            Increase_ALBtn = initButton(100, 120, 60, 30, "Inc", container, event -> {
+                amendFrequencyAction(F_INC);
+            });
+            Decrease_ALBtn = initButton(180, 120, 60, 30, "Dec", container, event -> {
+                amendFrequencyAction(-F_INC);
+            });
 
-            Label attValsLabel = new Label("      0.25       1.0        10");
-            attValsLabel.setFont(smallFont);
-            attValsLabel.setBounds(88, 260, 150, 20);
-            container.add(attValsLabel);
+            // 4th row - attenuation level
+            attnValueLabel = initLabel(35, 170, 200, 40, bigFont, "unknown", container);
             
-            Label oscLockLabel = new Label("Osc. Lock Detected");
-            oscLockLabel.setFont(smallFont);
-            oscLockLabel.setBounds(100, 325, 120, 20);
-            container.add(oscLockLabel);
-            
-            Label psuHealthyLabel = new Label("PSU Healthy");
-            psuHealthyLabel.setFont(smallFont);
-            psuHealthyLabel.setBounds(100, 375, 100, 20);
-            container.add(psuHealthyLabel);
-            
-            synthValueLabel.setFont(bigFont);
-            synthValueLabel.setBounds(35, 60, 200, 40);
-            container.add(synthValueLabel);
+            // 5th row - enter, inc & dec buttons for attenuation
+            initButton(20, 240, 60, 60, "Enter", container, event -> {
+                enterAction();
+                updateAttenuationLabel();
+            });
 
-            attnValueLabel.setFont(bigFont);
-            attnValueLabel.setBounds(35, 170, 200, 40);
-            container.add(attnValueLabel);
-            
-            connectionCounterLabel.setFont(smallFont);
-            connectionCounterLabel.setBounds(270, 570, 30, 20);
-            connectionCounterLabel.setForeground(Color.GRAY);
-            add(connectionCounterLabel);
-            
-            // Local/remote LED
-            localRemoteLed.setRadius(LED_r);
-            localRemoteLed.setBounds(LED1_x, LED1_y, LED_dx, LED_dy);
-            localRemoteLed.setBorderColor(Color.ORANGE);
-            container.add(localRemoteLed);
-            
-            // Synth Lock LED
-            synthLockLed.setRadius(LED_r);
-            synthLockLed.setBounds(LED1_x, LED5_y, LED_dx, LED_dy);
-            synthLockLed.setBorderColor(Color.BLACK);
-            container.add(synthLockLed);
-            
-            // PSU alarm LED
-            psuAlarmLed.setRadius(LED_r);
-            psuAlarmLed.setBounds(LED1_x, LED6_y, LED_dx, LED_dy);
-            psuAlarmLed.setBorderColor(Color.GREEN);
-            container.add(psuAlarmLed);
-            
-            Refresh_ALBtn.setBounds(20, 420, 220, 30);
+            initButton(110, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INC));
+            initButton(160, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INCx));
+            initButton(210, 240, 30, 20, "^", container, event -> amendAttenuationAction(A_INCxx));
+            initLabel(88, 260, 150, 20, smallFont, "      0.25       1.0        10", container);
+            initButton(110, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INC));
+            initButton(160, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCx));
+            initButton(210, 280, 30, 20, "v", container, event -> amendAttenuationAction(-A_INCxx));
 
-            ipAddrLabel.setBounds(40, 470, 70, 20);
+            // 6th row - oscillator lock
+            synthLockLed = initLed(LED2_y, Color.BLACK, container);
+            initLabel(100, 325, 120, 20, smallFont, "Osc. Lock Detected", container);
+
+            // 7th row - PSU OK
+            psuAlarmLed = initLed(LED3_y, Color.GREEN, container);
+            initLabel(100, 375, 100, 20, smallFont, "PSU Healthy", container);
+
+            // 8th row - button to update data from mbed
+            initButton(20, 420, 220, 30, "Update Connection Data", container, event -> get_data());
+
+            // 9th row - IP address
+            initLabel(40, 470, 70, 20, smallFont, "IP Address", container);
             ipAddrField.setBounds(110, 470, 120, 20);
-
-            ipMaskLabel.setBounds(40, 500, 70, 20);
-            ipMaskField.setBounds(110, 500, 120, 20);
-
-            ipSet.setBounds(160, 530, 60, 20);
-            ipErrorLabel.setBounds(20, 560, 220, 20);
-
-            container.add(LocalActive_ALBtn);
-            container.add(Enter_ALBtn);
-            container.add(Enter2_ALBtn);
-            container.add(Increase_ALBtn);
-            container.add(Decrease_ALBtn);
-            container.add(AttInc_ALBtn);
-            container.add(AttDec_ALBtn);
-            container.add(AttIncx_ALBtn);
-            container.add(AttDecx_ALBtn);
-            container.add(AttIncxx_ALBtn);
-            container.add(AttDecxx_ALBtn);
-            container.add(Refresh_ALBtn);
-            container.add(ipAddrLabel);
             container.add(ipAddrField);
-            container.add(ipMaskLabel);
+
+            // 10 row - IP mask
+            initLabel(40, 500, 70, 20, smallFont, "IP Mask", container);
+            ipMaskField.setBounds(110, 500, 120, 20);
             container.add(ipMaskField);
-            container.add(ipErrorLabel);
-            container.add(ipSet);
 
-            LocalActive_ALBtn.addActionListener(this);
-            Enter_ALBtn.addActionListener(this);
-            Enter2_ALBtn.addActionListener(this);
-            Increase_ALBtn.addActionListener(this);
-            Decrease_ALBtn.addActionListener(this);
-            AttInc_ALBtn.addActionListener(this);
-            AttDec_ALBtn.addActionListener(this);
-            AttIncx_ALBtn.addActionListener(this);
-            AttDecx_ALBtn.addActionListener(this);
-            AttIncxx_ALBtn.addActionListener(this);
-            AttDecxx_ALBtn.addActionListener(this);
-            Refresh_ALBtn.addActionListener(this);
-            ipSet.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
+            // 11th row - update IP button (with action)
+            ipSet = initButton(160, 530, 60, 20, "Update IP", container, event -> {
+                try {
+                    int addr = ipIntFromTextField(ipAddrField);
+                    int mask = ipIntFromTextField(ipMaskField);
+
+                    ipAddrField.setText("IP address updating");
+                    ipMaskField.setText("IP mask updating");
+                    ipErrorLabel.setText("");
                     try {
-                        int addr = ipIntFromTextField(ipAddrField);
-                        int mask = ipIntFromTextField(ipMaskField);
-
-                        ipAddrField.setText("IP address updating");
-                        ipMaskField.setText("IP mask updating");
-                        ipErrorLabel.setText("");
-                        try {
-                            Thread.sleep(1000);  // give time for repaint
-                        } catch (InterruptedException x) {
-                            System.out.println("This is surprising... Thread.sleep() raised InterruptedException");
-                            Thread.currentThread().interrupt();
-                        }
-
-                        ipAddrRpc.write(addr);
-                        ipMaskRpc.write(mask);
-                        CtrlAction.write(7); // notify IP change
-                    } catch (IllegalArgumentException x) {
-                        ipErrorLabel.setText(x.getMessage());
+                        Thread.sleep(1000);  // give time for repaint
+                    } catch (InterruptedException x) {
+                        System.out.println("This is surprising... Thread.sleep() raised InterruptedException");
+                        Thread.currentThread().interrupt();
                     }
-                }});
 
+                    ipAddrRpc.write(addr);
+                    ipMaskRpc.write(mask);
+                    CtrlAction.write(7); // notify IP change
+                } catch (IllegalArgumentException x) {
+                    ipErrorLabel.setText(x.getMessage());
+                }
+            });
+
+            // 12th row - place for error text from IP update to display
+            ipErrorLabel = initLabel(20, 560, 220, 20, smallFont, "", container);
+
+            // Label outside container showing comms count
+            connectionCounterLabel = initLabel(270, 570, 30, 20, smallFont, "", this);
+            connectionCounterLabel.setForeground(Color.GRAY);
+            // ======== end of UI layout ========
+
+            
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
             get_data();
@@ -372,15 +311,8 @@ public class tltapplet extends Applet implements ActionListener {
             comms_active = 0;
             
             // All is not well with the world
-            Label inactiveLabel1 = new Label("Connection Error:");
-            inactiveLabel1.setFont(smallFont);
-            inactiveLabel1.setBounds(50, 80, 120, 20);
-            container.add(inactiveLabel1);
-
-            Label inactiveLabel2 = new Label("Comms Already In Use");
-            inactiveLabel2.setFont(smallFont);
-            inactiveLabel2.setBounds(50, 100, 150, 20);
-            container.add(inactiveLabel2);
+            initLabel(50, 80, 120, 20, smallFont, "Connection Error:", container);
+            initLabel(50, 100, 150, 20, smallFont, "Comms Already In Use", container);
         }
     }
 
@@ -469,17 +401,6 @@ public class tltapplet extends Applet implements ActionListener {
                 SynthFrequency, Attenuation, attenuationMax);
     }
 
-    private void updateSynthLabel() {
-        synthValueLabel.setText(SerialAlarm_i != 0 ?
-                "Synth ALM" :
-                String.format("%4d  MHz %s", SynthFrequency, FreqUpdateIcon >= 1 ? "X" : ""));
-    }
-
-    private void updateAttenuationLabel() {
-        attnValueLabel.setText(
-                String.format("%6.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
-    }
-
     // **************************************************************************
     // * function to be called for each refresh iteration
     // *
@@ -507,117 +428,80 @@ public class tltapplet extends Applet implements ActionListener {
         }
     };
 
-    // Here we ask which component called this method
-    @Override
-    public void actionPerformed(ActionEvent evt) {
-        if (evt.getSource() == LocalActive_ALBtn) {
-            CtrlAction.write(0x03); // LR on
-            CtrlAction.write(0x04); // LR off
-            get_data();
-        }
-
-        if (evt.getSource() == Refresh_ALBtn) {
-            get_data();
-        }
-
-        if (!frontPanelControlled) {
-            if (evt.getSource() == Enter_ALBtn) {
-                SynthFrequencyUpdate.write(SynthFrequency);
-                AttenuatorUpdate.write(Attenuation);
-                CtrlAction.write(0x05); // Enter on
-                CtrlAction.write(0x06); // Enter off
-                FreqUpdateIcon = 0;
-                AttUpdateIcon = 0;
-                update_ctr = 0;
-                get_data();
-                updateSynthLabel();
-            }
-            if (evt.getSource() == Enter2_ALBtn) {
-                SynthFrequencyUpdate.write(SynthFrequency);
-                AttenuatorUpdate.write(Attenuation);
-                CtrlAction.write(0x05); // Enter on
-                CtrlAction.write(0x06); // Enter off
-                AttUpdateIcon = 0;
-                FreqUpdateIcon = 0;
-                update_ctr = 0;
-                get_data();
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == Increase_ALBtn) {
-                SynthFrequency = SynthFrequency + F_INC;
-                if (SynthFrequency >= SYNTH_FREQ_MAX) {
-                    SynthFrequency = SYNTH_FREQ_MAX;
-                }
-                FreqUpdateIcon = 1;
-                update_ctr = 0;
-                updateSynthLabel();
-            }
-            if (evt.getSource() == Decrease_ALBtn) {
-                SynthFrequency = SynthFrequency - F_INC;
-                if (SynthFrequency <= SYNTH_FREQ_MIN) {
-                    SynthFrequency = SYNTH_FREQ_MIN;
-                }
-                FreqUpdateIcon = 1;
-                update_ctr = 0;
-                updateSynthLabel();
-            }
-            if (evt.getSource() == AttInc_ALBtn) {
-                Attenuation = Attenuation + A_INC;
-                if (Attenuation >= attenuationMax) {
-                    Attenuation = attenuationMax;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == AttDec_ALBtn) {
-                Attenuation = Attenuation - A_INC;
-                if (Attenuation <= ATT_MIN) {
-                    Attenuation = ATT_MIN;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == AttIncx_ALBtn) {
-                Attenuation = Attenuation + A_INCx;
-                if (Attenuation >= attenuationMax) {
-                    Attenuation = attenuationMax;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == AttDecx_ALBtn) {
-                Attenuation = Attenuation - A_INCx;
-                if (Attenuation <= ATT_MIN) {
-                    Attenuation = ATT_MIN;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == AttIncxx_ALBtn) {
-                Attenuation = Attenuation + A_INCxx;
-                if (Attenuation >= attenuationMax) {
-                    Attenuation = attenuationMax;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-            if (evt.getSource() == AttDecxx_ALBtn) {
-                Attenuation = Attenuation - A_INCxx;
-                if (Attenuation <= ATT_MIN) {
-                    Attenuation = ATT_MIN;
-                }
-                AttUpdateIcon = 1;
-                update_ctr = 0;
-                updateAttenuationLabel();
-            }
-        }
+    // Factory methods to facilitate creation & initialisation of label, buttons & 'LED's
+    private Label initLabel(int x, int y, int width, int height, Font font, String text, Container container) {
+        Label label = new Label(text);
+        label.setFont(font);
+        label.setBounds(x, y, width, height);
+        container.add(label);
+        return label;
     }
 
+    private Button initButton(int x, int y, int width, int height, String name, Container container, ActionListener listener) {
+        Button button = new Button(name);
+        button.setBounds(x, y, width, height);
+        container.add(button);
+        button.addActionListener(listener);
+        return button;
+    }
+
+    private LedPanel initLed(int y, Color color, Container container) {
+        LedPanel panel = new LedPanel();
+        panel.setRadius(LED_r);
+        panel.setBounds(LED_x, y, LED_dx, LED_dy);
+        panel.setBorderColor(color);
+        container.add(panel);
+        return panel;
+    }
+
+    // 'Actions' for updating attenuation & frequency values + user pressing enter
+    private void amendAttenuationAction(int delta) {
+        if (frontPanelControlled)
+            return;
+        
+        Attenuation = Math.max(ATT_MIN, Math.min(attenuationMax, Attenuation + delta));
+        AttUpdateIcon = 1;
+        update_ctr = 0;
+        updateAttenuationLabel();
+    }
+    
+    private void amendFrequencyAction(int delta) {
+        if (frontPanelControlled)
+            return;
+        
+        SynthFrequency = Math.max(SYNTH_FREQ_MIN, Math.min(SYNTH_FREQ_MAX, SynthFrequency + delta));
+        FreqUpdateIcon = 1;
+        update_ctr = 0;
+        updateSynthLabel();
+    }
+    
+    private void enterAction() {
+        if (frontPanelControlled)
+            return;
+        
+        SynthFrequencyUpdate.write(SynthFrequency);
+        AttenuatorUpdate.write(Attenuation);
+        CtrlAction.write(0x05); // Enter on
+        CtrlAction.write(0x06); // Enter off
+        AttUpdateIcon = 0;
+        FreqUpdateIcon = 0;
+        update_ctr = 0;
+        get_data();
+    }
+
+    // Update synth & attenuation label text 
+    private void updateSynthLabel() {
+        synthValueLabel.setText(SerialAlarm_i != 0 ?
+                "Synth ALM" :
+                String.format("%4d  MHz %s", SynthFrequency, FreqUpdateIcon >= 1 ? "X" : ""));
+    }
+
+    private void updateAttenuationLabel() {
+        attnValueLabel.setText(
+                String.format("%6.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
+    }
+
+    // Methods for converting to/from IP address/mask string/int 
     private void setIpTextField(TextField ipField, RemoteFactory.Integer ipRpc) {
         // NOTE: Byte order for char[4] read from mbed
         int value = ipRpc.read_int();
