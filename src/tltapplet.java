@@ -358,9 +358,9 @@ public class tltapplet extends Applet implements ActionListener {
                     }
                 }});
 
-            get_data();
             SynthFrequency = SynthFrequencyActual.read_int();
             Attenuation = AttenuatorActual.read_int();
+            get_data();
 
             // get limits on user entered frequency from mbed (no longer using SynthType_i)
             SYNTH_FREQ_MIN = minFrequencyMHz.read_int();
@@ -440,7 +440,7 @@ public class tltapplet extends Applet implements ActionListener {
         synthLockLed.setLedColor(c);
         
         // 'Light the LED' green if the PSU is OK
-        psuAlarmLed.setLedColor(PSU1Alarm_i != 0 ? Color.green : Color.white);
+        psuAlarmLed.setLedColor(PSU1Alarm_i == 0 ? Color.green : Color.white);
 
         if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
@@ -477,7 +477,7 @@ public class tltapplet extends Applet implements ActionListener {
 
     private void updateAttenuationLabel() {
         attnValueLabel.setText(
-                String.format("%4.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
+                String.format("%6.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
     }
 
     // **************************************************************************
