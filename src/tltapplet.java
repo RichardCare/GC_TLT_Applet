@@ -65,6 +65,16 @@ public class tltapplet extends Applet {
     // Constants
     private static final long serialVersionUID = 1L;
     
+    // Remote command values
+    private static final int RemoteCommsOn = 1;  
+    private static final int RemoteCommsOff = 2;
+    private static final int LocalRemoteOn = 3;
+    private static final int LocalRemoteOff = 4;
+    private static final int EnterOn = 5;
+    private static final int EnterOff = 6;
+    private static final int IPChanged = 7;
+    private static final int ToggleAttenuationMute = 8;
+
     // screen position coordinates for drawing LEDs, buttons and text
     private static final int LED_x = 20;
     private static final int LED_dx = 40;
@@ -174,7 +184,7 @@ public class tltapplet extends Applet {
 
         if (isCommsAvailable) {
             CtrlAction = factory.create("RemoteCtrlAction");
-            CtrlAction.write(0x01); // 01=Set Remote Comms Open/Active
+            CtrlAction.write(RemoteCommsOn);
 
             SynthFrequencyActual = factory.create("RemoteSynthFrequencyActual");
             SynthFrequencyUpdate = factory.create("RemoteSynthFrequencyUpdate");
@@ -201,8 +211,8 @@ public class tltapplet extends Applet {
             // Top row - local/remote LED & button
             localRemoteLed = initLed(21, Color.ORANGE, container);
             initButton(80, 20, 160, 30, "Local / Remote", container, event -> {
-                CtrlAction.write(0x03); // LR on
-                CtrlAction.write(0x04); // LR off
+                CtrlAction.write(LocalRemoteOn);
+                CtrlAction.write(LocalRemoteOff);
                 get_data();
             });
 
@@ -294,7 +304,7 @@ public class tltapplet extends Applet {
 
                     ipAddrRpc.write(addr);
                     ipMaskRpc.write(mask);
-                    CtrlAction.write(7); // notify IP change
+                    CtrlAction.write(IPChanged);
                 } catch (IllegalArgumentException x) {
                     ipErrorLabel.setText(x.getMessage());
                 }
@@ -340,7 +350,7 @@ public class tltapplet extends Applet {
     @Override
     public void stop() {
         if (isCommsAvailable) {
-            CtrlAction.write(0x02); // 01=Set Remote Comms off
+            CtrlAction.write(RemoteCommsOff);
             refresh_timer.stop();
         }
         mbed.delete();
@@ -350,7 +360,7 @@ public class tltapplet extends Applet {
     @Override
     public void destroy() {
         if (isCommsAvailable) {
-            CtrlAction.write(0x02); // 01=Set Remote Comms off
+            CtrlAction.write(RemoteCommsOff);
         }
         super.destroy();
         mbed.delete();
@@ -491,8 +501,8 @@ public class tltapplet extends Applet {
         
         SynthFrequencyUpdate.write(SynthFrequency);
         AttenuatorUpdate.write(Attenuation);
-        CtrlAction.write(0x05); // Enter on
-        CtrlAction.write(0x06); // Enter off
+        CtrlAction.write(EnterOn);
+        CtrlAction.write(EnterOff);
         showAttnChangedX = false;
         showFreqChangedX = false;
         update_ctr = 0;
@@ -501,7 +511,7 @@ public class tltapplet extends Applet {
 
     private void muteAction() {
         if (!frontPanelControlled) {
-            CtrlAction.write(8);
+            CtrlAction.write(ToggleAttenuationMute);
         }
     }
 
