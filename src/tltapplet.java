@@ -62,25 +62,9 @@ public class tltapplet extends Applet {
         }
     }
 
-    HTTPRPC mbed;
-    boolean threadSuspended;
-    Timer refresh_timer;
+    // Constants
     private static final long serialVersionUID = 1L;
-
-    // setup local and rpc variables
-    RemoteFactory.Integer CtrlAction;
-    RemoteFactory.Integer LEDStatus;
-    RemoteFactory.Integer SynthFrequencyActual;
-    RemoteFactory.Integer SynthFrequencyUpdate;
-    RemoteFactory.Integer AttenuatorActual;
-    RemoteFactory.Integer AttenuatorUpdate;
-
-    RemoteFactory.Integer minFrequencyMHz;
-    RemoteFactory.Integer maxFrequencyMHz;
-
-    RemoteFactory.Integer ipAddrRpc;
-    RemoteFactory.Integer ipMaskRpc;
-
+    
     // screen position coordinates for drawing LEDs, Btns and text
     private static final int LED1_y = 21;
     private static final int LED2_y = 321;
@@ -90,58 +74,70 @@ public class tltapplet extends Applet {
     private static final int LED_dy = 28;
     private static final int LED_r = 6;
 
-    boolean frontPanelControlled = false;
-    boolean isPLO = false;
-    int SynthLockLED_i = 0;
+    private static final int F_INC = 25; // frequency increment value in MHz
 
-    int PSU1Alarm_i = 0;
-    int SynthType_i = 0;
-    int AttType_i = 0;
-    int SerialAlarm_i = 0;
+    // Attenuation constants
+    private static final int ATT_MIN = 0;
+    private static final int A_INC = 1;     // == 0.25dB
+    private static final int A_INCx = 4;    // == 1dB
+    private static final int A_INCxx = 40;  // == 10 dB
+
+    // Fonts used in UI
+    private static final Font smallFont = new Font("Arial", Font.PLAIN, 13);
+    private static final Font bigFont = new Font("Arial", Font.PLAIN, 32);
+
+    // Member fields
+    private HTTPRPC mbed;
+    private Timer refresh_timer;
+
+    // setup local and rpc variables
+    private RemoteFactory.Integer CtrlAction;
+    private RemoteFactory.Integer LEDStatus;
+    private RemoteFactory.Integer SynthFrequencyUpdate;
+    private RemoteFactory.Integer AttenuatorUpdate;
+    private RemoteFactory.Integer SynthFrequencyActual;
+    private RemoteFactory.Integer AttenuatorActual;
+
+    private RemoteFactory.Integer minFrequencyMHz;
+    private RemoteFactory.Integer maxFrequencyMHz;
+
+    private RemoteFactory.Integer ipAddrRpc;
+    private RemoteFactory.Integer ipMaskRpc;
+
+    private boolean frontPanelControlled = false;
+
+    private boolean isSynthAlarm;
     private boolean ploOscAlarm;
 
-    int SynthFrequency;
-    int FreqUpdateIcon = 0; // displayed if the frequency has been changed
-    int F_INC = 25; // increment value in MHz
-    int SYNTH_FREQ_MIN;
-    int SYNTH_FREQ_MAX;
+    private boolean showFreqChangedX;
+    private int SynthFrequency;
+    private int synthFreqMin;
+    private int synthFreqMax;
 
-    int Attenuation;
-    int AttUpdateIcon = 0; // displayed if the attenuator has been changed
-    int A_INC = 1; // increment value in bits
-    int A_INCx = 4; // increment value in bits
-    int A_INCxx = 40; // increment value in bits
-    int ATT_MIN = 0;
-    int attenuationMax;
+    private boolean showAttnChangedX;
+    private int Attenuation;
+    private int attenuationMax;
 
-    int CtrlStatusData = 0;
-    int CommsOpenFlag = 0;
-    int comms_active = 0;
-    int connection_ctr = 0;
-    int update_ctr = 0;
+    private boolean isCommsAvailable;
+    private int connection_ctr = 0;
+    private int update_ctr = 0;
 
-    int ipAddr;
-    int ipMask;
-
-    Font smallFont = new Font("Arial", Font.PLAIN, 13);
-    Font bigFont = new Font("Arial", Font.PLAIN, 32);
-
-    Button Enter_ALBtn;
-    Button Increase_ALBtn;
-    Button Decrease_ALBtn;
+    private Button Enter_ALBtn;
+    private Button Increase_ALBtn;
+    private Button Decrease_ALBtn;
     
-    LedPanel localRemoteLed;
-    LedPanel synthLockLed;
-    LedPanel psuAlarmLed;
+    private LedPanel localRemoteLed;
+    private LedPanel synthLockLed;
+    private LedPanel psuAlarmLed;
     
-    Label synthValueLabel;
-    Label attnValueLabel;
-    Label connectionCounterLabel;
+    private Label synthValueLabel;
+    private Label attnValueLabel;
+    private Label connectionCounterLabel;
     
-    TextField ipAddrField = new TextField(20);
-    TextField ipMaskField = new TextField(20);
-    Label ipErrorLabel;
-    Button ipSet;
+    private final TextField ipAddrField = new TextField(20);
+    private final TextField ipMaskField = new TextField(20);
+    private Label ipErrorLabel;
+    private Button ipSet;
 
     // **************************************************************************
     // * function to initialise
@@ -166,7 +162,7 @@ public class tltapplet extends Applet {
         LEDStatus = factory.create("RemoteLEDStatus");
         int ledStatusI = LEDStatus.read_int();
         System.out.format("LEDStatus %04X\n", ledStatusI);
-        CommsOpenFlag = (ledStatusI >> 12) & 0x01;
+        isCommsAvailable = ((ledStatusI >> 12) & 0x01) == 0;
         
         LedPanel container = new LedPanel();
         container.setLayout(null);
@@ -176,10 +172,9 @@ public class tltapplet extends Applet {
         container.setLedColor(Color.WHITE);
         add(container);
 
-        if (CommsOpenFlag == 0) {
+        if (isCommsAvailable) {
             CtrlAction = factory.create("RemoteCtrlAction");
             CtrlAction.write(0x01); // 01=Set Remote Comms Open/Active
-            comms_active = 1;
 
             SynthFrequencyActual = factory.create("RemoteSynthFrequencyActual");
             SynthFrequencyUpdate = factory.create("RemoteSynthFrequencyUpdate");
@@ -199,7 +194,7 @@ public class tltapplet extends Applet {
                 System.err.println("No parameter found");
                 rate = 1000;
             }
-            refresh_timer = new Timer(rate, timerListener);
+            refresh_timer = new Timer(rate, event -> timerAction(event));
             refresh_timer.start();
 
             // ======== Create & initialise UI components - roughly in y, x order ========
@@ -302,15 +297,13 @@ public class tltapplet extends Applet {
             get_data();
 
             // get limits on user entered frequency from mbed (no longer using SynthType_i)
-            SYNTH_FREQ_MIN = minFrequencyMHz.read_int();
-            SYNTH_FREQ_MAX = maxFrequencyMHz.read_int();
+            synthFreqMin = minFrequencyMHz.read_int();
+            synthFreqMax = maxFrequencyMHz.read_int();
 
             System.out.format("Synth frequency: actual = %d, limits: min = %d  max = %d\n",
-                            SynthFrequency, SYNTH_FREQ_MIN, SYNTH_FREQ_MAX);
+                            SynthFrequency, synthFreqMin, synthFreqMax);
         } else {
-            comms_active = 0;
-            
-            // All is not well with the world
+            // Another UI is communicating with the mbed
             initLabel(50, 80, 120, 20, smallFont, "Connection Error:", container);
             initLabel(50, 100, 150, 20, smallFont, "Comms Already In Use", container);
         }
@@ -321,14 +314,14 @@ public class tltapplet extends Applet {
     // *
     @Override
     public void start() {
-        if (comms_active == 1) {
+        if (isCommsAvailable) {
             refresh_timer.start();
         }
     }
 
     @Override
     public void stop() {
-        if (comms_active == 1) {
+        if (isCommsAvailable) {
             CtrlAction.write(0x02); // 01=Set Remote Comms off
             refresh_timer.stop();
         }
@@ -338,7 +331,7 @@ public class tltapplet extends Applet {
 
     @Override
     public void destroy() {
-        if (comms_active == 1) {
+        if (isCommsAvailable) {
             CtrlAction.write(0x02); // 01=Set Remote Comms off
         }
         super.destroy();
@@ -350,29 +343,27 @@ public class tltapplet extends Applet {
     // * function to get data from mbed RPC variable
     // *
     public void get_data() {
-
         int LEDStatus_i = LEDStatus.read_int();
 
         ploOscAlarm = ((LEDStatus_i >> 1) & 0x00000001) != 0;
-        SynthLockLED_i = ((LEDStatus_i >> 2) & 0x00000001);
+        boolean synthLocked = ((LEDStatus_i >> 2) & 0x00000001) != 0;
         frontPanelControlled = (LEDStatus_i & 0x10) != 0;
-        isPLO = (LEDStatus_i & 0x20) != 0;
-        PSU1Alarm_i = ((LEDStatus_i >> 7) & 0x00000001);
-        SynthType_i = ((LEDStatus_i >> 9) & 0x00000001);
-        AttType_i = ((LEDStatus_i >> 10) & 0x00000001);
-        SerialAlarm_i = ((LEDStatus_i >> 11) & 0x00000001);
+        boolean isPLO = (LEDStatus_i & 0x20) != 0;
+        boolean isPsuAlarm = ((LEDStatus_i >> 7) & 0x00000001) != 0;
+        boolean is8bitAttenuator = ((LEDStatus_i >> 10) & 0x00000001) != 0;
+        isSynthAlarm = ((LEDStatus_i >> 11) & 0x00000001) != 0;
 
         // 'Light the LED' orange if web UI has control
         localRemoteLed.setLedColor(frontPanelControlled ? Color.white : Color.orange);
         
         // 'Light the LED' good or bad
-        boolean isAlarm = (!isPLO && SynthLockLED_i == 0) || (isPLO && ploOscAlarm);
+        boolean isAlarm = (!isPLO && !synthLocked) || (isPLO && ploOscAlarm);
         Color c = isAlarm ? Color.red : Color.green;
         synthLockLed.setBorderColor(c);
         synthLockLed.setLedColor(c);
         
         // 'Light the LED' green if the PSU is OK
-        psuAlarmLed.setLedColor(PSU1Alarm_i == 0 ? Color.green : Color.white);
+        psuAlarmLed.setLedColor(!isPsuAlarm ? Color.green : Color.white);
 
         if (frontPanelControlled) {
             SynthFrequency = SynthFrequencyActual.read_int();
@@ -385,7 +376,7 @@ public class tltapplet extends Applet {
         Increase_ALBtn.setVisible(!isPLO);
         Decrease_ALBtn.setVisible(!isPLO);
 
-        attenuationMax = AttType_i < 1 ? 127 : 255;
+        attenuationMax = is8bitAttenuator ? 255 : 127;
 
         updateAttenuationLabel();
         
@@ -395,38 +386,37 @@ public class tltapplet extends Applet {
         setIpTextField(ipAddrField, ipAddrRpc);
         setIpTextField(ipMaskField, ipMaskRpc);
 
-        System.out.format("LEDStatus %04X SynthLockLED_i %d, frontPanelControlled %s, PSU1Alarm_i %d, SynthType_i %d, AttType_i %d, SerialAlarm_i %d\n" +
+        System.out.format("LEDStatus %04X synthLocked %s, frontPanelControlled %s, isPsuAlarm %s, is8bitAttenuator %s, isSynthAlarm %s\n" +
                 "SynthFrequency %d, Attenuation %d, attenuationMax %d\n", 
-                LEDStatus_i, SynthLockLED_i, Boolean.toString(frontPanelControlled), PSU1Alarm_i, SynthType_i, AttType_i, SerialAlarm_i,
+                LEDStatus_i, synthLocked, frontPanelControlled, isPsuAlarm, is8bitAttenuator, isSynthAlarm,
                 SynthFrequency, Attenuation, attenuationMax);
     }
 
     // **************************************************************************
     // * function to be called for each refresh iteration
-    // *
-    ActionListener timerListener = new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent ev) {
+    private void timerAction(ActionEvent ev) {
+        connection_ctr++;
+        if (connection_ctr >= 999) {
+            connection_ctr = 0;
+        }
+        connectionCounterLabel.setText(String.valueOf(connection_ctr));
 
-            connection_ctr = connection_ctr + 1;
-            if (connection_ctr >= 999) {
-                connection_ctr = 0;
-            }
-            connectionCounterLabel.setText(String.valueOf(connection_ctr));
-            
-            // get_data();
-            if ((FreqUpdateIcon == 1) | (AttUpdateIcon == 1)) {
-                update_ctr = update_ctr + 1;
-                if (update_ctr > 5) {
-                    FreqUpdateIcon = 0;
-                    SynthFrequency = SynthFrequencyActual.read_int();
-                    AttUpdateIcon = 0;
-                    Attenuation = AttenuatorActual.read_int();
-                    update_ctr = 0;
-                }
+        // get_data();
+        if (showFreqChangedX || showAttnChangedX) {
+            update_ctr++;
+            if (update_ctr > 5) {
+                update_ctr = 0;
+
+                showFreqChangedX = false;
+                SynthFrequency = SynthFrequencyActual.read_int();
+                updateSynthLabel();
+
+                showAttnChangedX = false;
+                Attenuation = AttenuatorActual.read_int();
+                updateAttenuationLabel();
             }
         }
-    };
+    }
 
     // Factory methods to facilitate creation & initialisation of label, buttons & 'LED's
     private Label initLabel(int x, int y, int width, int height, Font font, String text, Container container) {
@@ -460,7 +450,7 @@ public class tltapplet extends Applet {
             return;
         
         Attenuation = Math.max(ATT_MIN, Math.min(attenuationMax, Attenuation + delta));
-        AttUpdateIcon = 1;
+        showAttnChangedX = true;
         update_ctr = 0;
         updateAttenuationLabel();
     }
@@ -469,8 +459,8 @@ public class tltapplet extends Applet {
         if (frontPanelControlled)
             return;
         
-        SynthFrequency = Math.max(SYNTH_FREQ_MIN, Math.min(SYNTH_FREQ_MAX, SynthFrequency + delta));
-        FreqUpdateIcon = 1;
+        SynthFrequency = Math.max(synthFreqMin, Math.min(synthFreqMax, SynthFrequency + delta));
+        showFreqChangedX = true;
         update_ctr = 0;
         updateSynthLabel();
     }
@@ -483,22 +473,22 @@ public class tltapplet extends Applet {
         AttenuatorUpdate.write(Attenuation);
         CtrlAction.write(0x05); // Enter on
         CtrlAction.write(0x06); // Enter off
-        AttUpdateIcon = 0;
-        FreqUpdateIcon = 0;
+        showAttnChangedX = false;
+        showFreqChangedX = false;
         update_ctr = 0;
         get_data();
     }
 
     // Update synth & attenuation label text 
     private void updateSynthLabel() {
-        synthValueLabel.setText(SerialAlarm_i != 0 ?
+        synthValueLabel.setText(isSynthAlarm ?
                 "Synth ALM" :
-                String.format("%4d  MHz %s", SynthFrequency, FreqUpdateIcon >= 1 ? "X" : ""));
+                String.format("%4d  MHz %s", SynthFrequency, showFreqChangedX ? "X" : ""));
     }
 
     private void updateAttenuationLabel() {
         attnValueLabel.setText(
-                String.format("%6.2f  dB %s", Attenuation * 0.25, AttUpdateIcon >= 1 ? "X" : ""));
+                String.format("%6.2f  dB %s", Attenuation * 0.25, showAttnChangedX ? "X" : ""));
     }
 
     // Methods for converting to/from IP address/mask string/int 
